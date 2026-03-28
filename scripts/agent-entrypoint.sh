@@ -68,6 +68,10 @@ case "${OPTIO_AGENT_TYPE}" in
     echo "[optio] Running OpenAI Codex..."
     codex exec --full-auto "${OPTIO_PROMPT}" --json
     ;;
+  opencode)
+    echo "[optio] Running Opencode AI..."
+    opencode --prompt "${OPTIO_PROMPT}" --json
+    ;;
   *)
     echo "[optio] Unknown agent type: ${OPTIO_AGENT_TYPE}"
     exit 1

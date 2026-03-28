@@ -22,6 +22,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g opencode-ai
 
 # Allow sudo for extra package installation at runtime
 RUN apt-get update && apt-get install -y sudo \

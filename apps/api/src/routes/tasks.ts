@@ -42,7 +42,7 @@ const createTaskSchema = z.object({
   prompt: z.string().min(1),
   repoUrl: z.string().url(),
   repoBranch: z.string().optional(),
-  agentType: z.enum(["claude-code", "codex"]),
+  agentType: z.enum(["claude-code", "codex", "opencode"]),
   ticketSource: z.string().optional(),
   ticketExternalId: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
