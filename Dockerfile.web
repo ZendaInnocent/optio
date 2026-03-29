@@ -16,8 +16,14 @@ COPY packages/container-runtime/package.json packages/container-runtime/tsconfig
 COPY packages/agent-adapters/package.json packages/agent-adapters/tsconfig.json packages/agent-adapters/
 COPY packages/ticket-providers/package.json packages/ticket-providers/tsconfig.json packages/ticket-providers/
 
-# Install all dependencies (dev deps needed for build)
-RUN pnpm install --frozen-lockfile --prod=false
+# Ensure devDependencies are installed for all workspace packages
+ENV NPM_CONFIG_PRODUCTION=false
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# Verify TypeScript is installed for the shared package
+RUN test -d packages/shared/node_modules/typescript || (echo "TypeScript not installed in @optio/shared" && exit 1)
 
 # ---- Builder stage ----
 FROM deps AS builder

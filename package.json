@@ -18,6 +18,7 @@
     "db:migrate": "turbo db:migrate",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "verify:docker-build": "bash scripts/verify-docker-build.sh",
     "prepare": "husky"
   },
   "devDependencies": {
