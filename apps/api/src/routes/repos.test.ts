@@ -227,6 +227,81 @@ describe("PATCH /api/repos/:id", () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  it("updates opencodeModel", async () => {
+    mockGetRepo.mockResolvedValue(mockRepoData);
+    mockUpdateRepo.mockResolvedValue({ ...mockRepoData, opencodeModel: "o4-mini" });
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/repos/repo-1",
+      payload: { opencodeModel: "o4-mini" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUpdateRepo).toHaveBeenCalledWith(
+      "repo-1",
+      expect.objectContaining({ opencodeModel: "o4-mini" }),
+    );
+  });
+
+  it("updates opencodeTemperature", async () => {
+    mockGetRepo.mockResolvedValue(mockRepoData);
+    mockUpdateRepo.mockResolvedValue({ ...mockRepoData, opencodeTemperature: "0.7" });
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/repos/repo-1",
+      payload: { opencodeTemperature: 0.7 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUpdateRepo).toHaveBeenCalledWith(
+      "repo-1",
+      expect.objectContaining({ opencodeTemperature: "0.7" }),
+    );
+  });
+
+  it("rejects invalid opencodeTemperature", async () => {
+    mockGetRepo.mockResolvedValue(mockRepoData);
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/repos/repo-1",
+      payload: { opencodeTemperature: 1.5 },
+    });
+
+    expect(res.statusCode).toBe(500);
+  });
+
+  it("updates opencodeTopP", async () => {
+    mockGetRepo.mockResolvedValue(mockRepoData);
+    mockUpdateRepo.mockResolvedValue({ ...mockRepoData, opencodeTopP: "0.9" });
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/repos/repo-1",
+      payload: { opencodeTopP: 0.9 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUpdateRepo).toHaveBeenCalledWith(
+      "repo-1",
+      expect.objectContaining({ opencodeTopP: "0.9" }),
+    );
+  });
+
+  it("rejects invalid opencodeTopP", async () => {
+    mockGetRepo.mockResolvedValue(mockRepoData);
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/repos/repo-1",
+      payload: { opencodeTopP: -0.1 },
+    });
+
+    expect(res.statusCode).toBe(500);
+  });
 });
 
 describe("DELETE /api/repos/:id", () => {

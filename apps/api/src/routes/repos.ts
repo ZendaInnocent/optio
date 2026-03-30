@@ -29,6 +29,9 @@ const updateRepoSchema = z.object({
   claudeContextWindow: z.string().optional(),
   claudeThinking: z.boolean().optional(),
   claudeEffort: z.string().optional(),
+  opencodeModel: z.string().optional(),
+  opencodeTemperature: z.number().min(0).max(1).optional(),
+  opencodeTopP: z.number().min(0).max(1).optional(),
   maxTurnsCoding: z.number().int().min(1).max(10000).optional(),
   maxTurnsReview: z.number().int().min(1).max(10000).optional(),
   autoResume: z.boolean().optional(),
@@ -156,7 +159,13 @@ export async function repoRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: resourceErrors.join(" ") });
     }
 
-    const repo = await repoService.updateRepo(id, body);
+    const serviceData = {
+      ...body,
+      opencodeTemperature: body.opencodeTemperature?.toString() ?? undefined,
+      opencodeTopP: body.opencodeTopP?.toString() ?? undefined,
+    };
+
+    const repo = await repoService.updateRepo(id, serviceData);
     if (!repo) return reply.status(404).send({ error: "Repo not found" });
     reply.send({ repo });
   });

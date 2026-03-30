@@ -21,8 +21,8 @@ export interface RepoRecord {
   claudeThinking: boolean;
   claudeEffort: string | null;
   opencodeModel: string | null;
-  opencodeTemperature: number | null;
-  opencodeTopP: number | null;
+  opencodeTemperature: string | null;
+  opencodeTopP: string | null;
   maxTurnsCoding: number | null;
   maxTurnsReview: number | null;
   autoResume: boolean;
@@ -148,6 +148,9 @@ export async function updateRepo(
     claudeContextWindow?: string;
     claudeThinking?: boolean;
     claudeEffort?: string;
+    opencodeModel?: string;
+    opencodeTemperature?: string | null;
+    opencodeTopP?: string | null;
     maxTurnsCoding?: number;
     maxTurnsReview?: number;
     autoResume?: boolean;
