@@ -28,9 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pod health monitoring** — automatic detection of crashed/OOM-killed pods, auto-restart, orphan worktree cleanup, and idle pod cleanup
 - **Secrets management** — AES-256-GCM encrypted secrets with global and repo-scoped support
 - **Prompt templates** — configurable system prompts with template variables and conditional blocks; per-repo overrides
-- **Per-repo agent settings** — configurable Claude model, context window, thinking mode, effort level, and max turns
+- **Per-repo agent settings** — configurable Claude model (context window, thinking mode, effort, max turns) and OpenCode settings (model, temperature, top_p)
 - **Auto-detect image preset** — detects project language (Node, Python, Go, Rust) from repo files and selects the appropriate container image
-- **Agent adapters** — pluggable adapter interface with Claude Code and OpenAI Codex implementations
+- **Agent adapters** — pluggable adapter interface with Claude Code, OpenAI Codex, and OpenCode implementations
 - **Container runtimes** — Docker and Kubernetes runtime backends
 - **Authentication** — API key and Max Subscription (OAuth) modes for Claude Code
 - **Error classification** — pattern-matching error classifier with human-readable titles, descriptions, and remediation suggestions

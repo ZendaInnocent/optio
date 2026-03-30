@@ -56,7 +56,9 @@ describe("OpencodeAdapter", () => {
 
     it("falls back to raw prompt when no rendered prompt", () => {
       const config = adapter.buildContainerConfig(baseInput);
-      expect(config.env.OPTIO_PROMPT).toBe("Fix the bug");
+      // buildPrompt adds instructions, so we check that it contains the original prompt
+      expect(config.env.OPTIO_PROMPT).toContain("Fix the bug");
+      expect(config.env.OPTIO_PROMPT).toContain("Instructions:");
     });
 
     it("includes setup files when task file is provided", () => {
@@ -82,9 +84,81 @@ describe("OpencodeAdapter", () => {
       expect(config.env.OPTIO_BRANCH_NAME).toBe("optio/task-test-123");
     });
 
-    it("requires GITHUB_TOKEN secret", () => {
+    it("requires GITHUB_TOKEN and OPENCODE_API_KEY when no model specified", () => {
       const config = adapter.buildContainerConfig(baseInput);
-      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN"]);
+      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN", "OPENCODE_API_KEY"]);
+    });
+
+    it("requires ANTHROPIC_API_KEY when model starts with anthropic/", () => {
+      const config = adapter.buildContainerConfig({
+        ...baseInput,
+        opencodeModel: "anthropic/claude-sonnet-4-20250514",
+      });
+      expect(config.requiredSecrets).toContain("GITHUB_TOKEN");
+      expect(config.requiredSecrets).toContain("ANTHROPIC_API_KEY");
+      expect(config.requiredSecrets).not.toContain("OPENAI_API_KEY");
+      expect(config.requiredSecrets).not.toContain("OPENCODE_API_KEY");
+    });
+
+    it("requires OPENAI_API_KEY when model starts with openai/", () => {
+      const config = adapter.buildContainerConfig({
+        ...baseInput,
+        opencodeModel: "openai/gpt-4.1",
+      });
+      expect(config.requiredSecrets).toContain("GITHUB_TOKEN");
+      expect(config.requiredSecrets).toContain("OPENAI_API_KEY");
+      expect(config.requiredSecrets).not.toContain("ANTHROPIC_API_KEY");
+      expect(config.requiredSecrets).not.toContain("OPENCODE_API_KEY");
+    });
+
+    it("requires OPENCODE_API_KEY for unknown model", () => {
+      const config = adapter.buildContainerConfig({
+        ...baseInput,
+        opencodeModel: "custom/model",
+      });
+      expect(config.requiredSecrets).toContain("GITHUB_TOKEN");
+      expect(config.requiredSecrets).toContain("OPENCODE_API_KEY");
+    });
+
+    it("creates opencode.json config file when model is set", () => {
+      const config = adapter.buildContainerConfig({
+        ...baseInput,
+        opencodeModel: "anthropic/claude-sonnet-4-20250514",
+        opencodeTemperature: 0.7,
+        opencodeTopP: 0.9,
+      });
+      expect(config.setupFiles ?? []).toHaveLength(1); // config file only
+      const configFile = (config.setupFiles ?? []).find(
+        (f) => f.path === ".opencode/opencode.json",
+      );
+      expect(configFile).toBeDefined();
+      const parsed = JSON.parse(configFile!.content);
+      expect(parsed.model).toBe("anthropic/claude-sonnet-4-20250514");
+      expect(parsed.temperature).toBe(0.7);
+      expect(parsed.top_p).toBe(0.9);
+    });
+
+    it("config file includes only model when temperature/top_p not set", () => {
+      const config = adapter.buildContainerConfig({
+        ...baseInput,
+        opencodeModel: "openai/gpt-4.1",
+      });
+      const configFile = (config.setupFiles ?? []).find(
+        (f) => f.path === ".opencode/opencode.json",
+      );
+      expect(configFile).toBeDefined();
+      const parsed = JSON.parse(configFile!.content);
+      expect(parsed.model).toBe("openai/gpt-4.1");
+      expect(parsed.temperature).toBeUndefined();
+      expect(parsed.top_p).toBeUndefined();
+    });
+
+    it("does not create config file when model is not set", () => {
+      const config = adapter.buildContainerConfig(baseInput);
+      const configFile = (config.setupFiles ?? []).find(
+        (f) => f.path === ".opencode/opencode.json",
+      );
+      expect(configFile).toBeUndefined();
     });
   });
 
@@ -108,17 +182,27 @@ describe("OpencodeAdapter", () => {
       expect(result.prUrl).toBe("https://github.com/org/repo/pull/42");
     });
 
-    it("extracts cost from usage data in JSON events", () => {
+    it("extracts tokens from usage data", () => {
       const logs = [
-        '{"type":"message","role":"assistant","content":"Working on it"}',
-        '{"type":"message","role":"assistant","content":"Done","usage":{"input_tokens":1000,"output_tokens":500}}',
+        '{"type":"message","role":"assistant","content":"Working"}',
+        '{"usage":{"input_tokens":1000,"output_tokens":500}}',
       ].join("\n");
       const result = adapter.parseResult(0, logs);
       expect(result.inputTokens).toBe(1000);
       expect(result.outputTokens).toBe(500);
     });
 
-    it("extracts cost from total_cost_usd when provided directly", () => {
+    it("calculates cost from tokens when total_cost_usd not provided", () => {
+      const logs = [
+        '{"model":"anthropic/claude-sonnet-4-20250514"}',
+        '{"usage":{"input_tokens":1000,"output_tokens":500}}',
+      ].join("\n");
+      const result = adapter.parseResult(0, logs);
+      // Expected: 1000/1e6 * 3.0 + 500/1e6 * 15.0 = 0.003 + 0.0075 = 0.0105
+      expect(result.costUsd).toBeCloseTo(0.0105, 4);
+    });
+
+    it("uses direct cost when total_cost_usd provided", () => {
       const logs = '{"type":"result","total_cost_usd":0.0534}';
       const result = adapter.parseResult(0, logs);
       expect(result.costUsd).toBe(0.0534);
@@ -141,6 +225,16 @@ describe("OpencodeAdapter", () => {
       const result = adapter.parseResult(0, "");
       expect(result.success).toBe(true);
       expect(result.costUsd).toBeUndefined();
+    });
+
+    it("detects errors in raw text", () => {
+      const logs = "Error: OPENCODE_API_KEY is invalid";
+      // Even with non-zero exit code, raw text error should be captured if present
+      const result = adapter.parseResult(1, logs);
+      expect(result.error).toBe("Error: OPENCODE_API_KEY is invalid");
+      // With exit code 0, same error detection
+      const result2 = adapter.parseResult(0, logs);
+      expect(result2.error).toBe("Error: OPENCODE_API_KEY is invalid");
     });
   });
 });

@@ -272,6 +272,12 @@ export function startTaskWorker() {
           claudeContextWindow: repoConfig?.claudeContextWindow ?? undefined,
           claudeThinking: repoConfig?.claudeThinking ?? undefined,
           claudeEffort: repoConfig?.claudeEffort ?? undefined,
+          // OpenCode settings
+          opencodeModel: repoConfig?.opencodeModel ?? undefined,
+          opencodeTemperature: repoConfig?.opencodeTemperature
+            ? Number(repoConfig.opencodeTemperature)
+            : undefined,
+          opencodeTopP: repoConfig?.opencodeTopP ? Number(repoConfig.opencodeTopP) : undefined,
         });
 
         // ── MCP servers & custom skills injection ────────────────────

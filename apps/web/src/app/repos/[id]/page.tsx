@@ -50,6 +50,9 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [claudeContextWindow, setClaudeContextWindow] = useState("1m");
   const [claudeThinking, setClaudeThinking] = useState(true);
   const [claudeEffort, setClaudeEffort] = useState("high");
+  const [opencodeModel, setOpencodeModel] = useState("");
+  const [opencodeTemperature, setOpencodeTemperature] = useState<number | "">("");
+  const [opencodeTopP, setOpencodeTopP] = useState<number | "">("");
   const [maxTurnsCoding, setMaxTurnsCoding] = useState(250);
   const [maxTurnsReview, setMaxTurnsReview] = useState(10);
   const [autoResume, setAutoResume] = useState(false);
@@ -119,6 +122,9 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
         setClaudeContextWindow(r.claudeContextWindow ?? "1m");
         setClaudeThinking(r.claudeThinking ?? true);
         setClaudeEffort(r.claudeEffort ?? "high");
+        setOpencodeModel(r.opencodeModel ?? "");
+        setOpencodeTemperature(r.opencodeTemperature ?? "");
+        setOpencodeTopP(r.opencodeTopP ?? "");
         setMaxTurnsCoding(r.maxTurnsCoding ?? 250);
         setMaxTurnsReview(r.maxTurnsReview ?? 10);
         setReviewEnabled(r.reviewEnabled ?? false);
@@ -184,6 +190,9 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
         claudeContextWindow,
         claudeThinking,
         claudeEffort,
+        opencodeModel: opencodeModel || undefined,
+        opencodeTemperature: opencodeTemperature !== "" ? Number(opencodeTemperature) : undefined,
+        opencodeTopP: opencodeTopP !== "" ? Number(opencodeTopP) : undefined,
         maxTurnsCoding,
         maxTurnsReview,
         reviewEnabled,
@@ -856,6 +865,73 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
             placeholder="250"
             className="w-48 px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
           />
+        </div>
+      </section>
+
+      {/* OpenCode Settings */}
+      <section className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-text-muted" />
+          <h2 className="text-sm font-medium">OpenCode AI</h2>
+        </div>
+        <p className="text-xs text-text-muted">
+          Configure OpenCode agent settings. Leave blank to use OpenCode with default settings.
+          Supported model formats:{" "}
+          <code className="text-primary">anthropic/claude-sonnet-4-20250514</code>,{" "}
+          <code className="text-primary">openai/gpt-4.1</code>, etc.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Model</label>
+            <input
+              value={opencodeModel}
+              onChange={(e) => setOpencodeModel(e.target.value)}
+              placeholder="e.g. anthropic/claude-sonnet-4-20250514"
+              className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+            />
+            <p className="text-[10px] text-text-muted/60 mt-1">
+              Model ID in format <code>provider/model-id</code>. Leave empty to use OpenCode
+              default.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Temperature</label>
+            <input
+              type="number"
+              step={0.1}
+              min={0}
+              max={1}
+              value={opencodeTemperature}
+              onChange={(e) =>
+                setOpencodeTemperature(e.target.value === "" ? "" : parseFloat(e.target.value))
+              }
+              placeholder="0.7"
+              className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+            />
+            <p className="text-[10px] text-text-muted/60 mt-1">
+              Randomness control (0 = deterministic, 1 = creative)
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Top P</label>
+            <input
+              type="number"
+              step={0.1}
+              min={0}
+              max={1}
+              value={opencodeTopP}
+              onChange={(e) =>
+                setOpencodeTopP(e.target.value === "" ? "" : parseFloat(e.target.value))
+              }
+              placeholder="Optional"
+              className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+            />
+            <p className="text-[10px] text-text-muted/60 mt-1">
+              Nucleus sampling threshold (optional)
+            </p>
+          </div>
         </div>
       </section>
 

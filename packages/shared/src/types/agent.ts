@@ -22,6 +22,10 @@ export interface AgentTaskInput {
   claudeContextWindow?: string;
   claudeThinking?: boolean;
   claudeEffort?: string;
+  // OpenCode-specific
+  opencodeModel?: string;
+  opencodeTemperature?: number;
+  opencodeTopP?: number;
 }
 
 export interface AgentContainerConfig {

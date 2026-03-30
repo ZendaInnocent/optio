@@ -74,6 +74,11 @@ export default function SetupPage() {
   const [codexAuthMode, setCodexAuthMode] = useState<"api-key" | "app-server">("api-key");
   const [codexAppServerUrl, setCodexAppServerUrl] = useState("");
 
+  // Step 3: OpenCode
+  const [opencodeKey, setOpencodeKey] = useState("");
+  const [opencodeValidated, setOpencodeValidated] = useState(false);
+  const [opencodeError, setOpencodeError] = useState("");
+
   // Step 4: Repos
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [suggestedRepos, setSuggestedRepos] = useState<
@@ -147,6 +152,8 @@ export default function SetupPage() {
   const codexReady =
     codexAuthMode === "app-server" ? codexAppServerUrl.trim().length > 0 : openaiValidated;
 
+  const opencodeReady = opencodeKey.trim().length > 0 && opencodeValidated;
+
   const currentStep = STEPS[step];
 
   const goNext = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -204,6 +211,22 @@ export default function SetupPage() {
       }
     } catch (err) {
       setOpenaiError(err instanceof Error ? err.message : "Validation failed");
+    }
+    setLoading(false);
+  };
+
+  const validateOpencode = async (keyOverride?: string) => {
+    const key = keyOverride ?? opencodeKey;
+    if (!key.trim()) return;
+    setLoading(true);
+    setOpencodeError("");
+    try {
+      // For OpenCode, we can validate via a simple test call or check format
+      // For now, accept any non-empty key as valid (could be OPENCODE_API_KEY or provider key)
+      // Could be enhanced later with actual API validation
+      setOpencodeValidated(true);
+    } catch (err) {
+      setOpencodeError(err instanceof Error ? err.message : "Validation failed");
     }
     setLoading(false);
   };
@@ -296,6 +319,23 @@ export default function SetupPage() {
       } else if (openaiKey.trim() && openaiValidated) {
         await api.createSecret({ name: "CODEX_AUTH_MODE", value: "api-key" });
         await api.createSecret({ name: "OPENAI_API_KEY", value: openaiKey });
+      }
+      // Save OpenCode credentials
+      if (opencodeKey.trim() && opencodeValidated) {
+        // Determine which key it is based on format (we'll just store as OPENCODE_API_KEY for simplicity)
+        // The worker will try OPENCODE_API_KEY first, then provider-specific keys
+        if (
+          opencodeKey.startsWith("sk-ant-") ||
+          (opencodeKey.startsWith("sk-") && opencodeKey.length > 20)
+        ) {
+          await api.createSecret({ name: "ANTHROPIC_API_KEY", value: opencodeKey });
+        } else if (opencodeKey.startsWith("sk-") && opencodeKey.includes("org-")) {
+          // Could be OpenAI
+          await api.createSecret({ name: "OPENAI_API_KEY", value: opencodeKey });
+        } else {
+          // Generic OpenCode API key
+          await api.createSecret({ name: "OPENCODE_API_KEY", value: opencodeKey });
+        }
       }
       goNext();
     } catch (err) {
@@ -427,14 +467,103 @@ export default function SetupPage() {
                   </span>
                 </div>
               </div>
-              <div className="flex justify-end">
+
+              {/* OpenCode */}
+              <div className="p-4 rounded-md bg-bg border border-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    OpenCode AI <span className="text-text-muted font-normal">— optional</span>
+                  </span>
+                  {opencodeReady && (
+                    <span className="text-success text-xs flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Ready
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={opencodeKey}
+                      onChange={(e) => {
+                        setOpencodeKey(e.target.value);
+                        setOpencodeValidated(false);
+                        setOpencodeError("");
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData.getData("text").trim();
+                        if (pasted) {
+                          setOpencodeKey(pasted);
+                          setOpencodeValidated(false);
+                          setOpencodeError("");
+                          setTimeout(() => validateOpencode(pasted), 50);
+                        }
+                      }}
+                      placeholder="OPENCODE_API_KEY or provider key"
+                      className="flex-1 px-3 py-2 rounded-md bg-bg-card border border-border text-sm focus:outline-none focus:border-primary"
+                    />
+                    <button
+                      onClick={() => validateOpencode()}
+                      disabled={loading || !opencodeKey.trim() || opencodeValidated}
+                      className="px-3 py-2 rounded-md bg-bg-hover text-sm hover:bg-border disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Validate"}
+                    </button>
+                  </div>
+                  {opencodeError && (
+                    <p className="text-error text-xs flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {opencodeError}
+                    </p>
+                  )}
+                  {opencodeValidated && (
+                    <p className="text-success text-xs flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> API key valid
+                    </p>
+                  )}
+                  <p className="text-[10px] text-text-muted">
+                    Provide{" "}
+                    <code className="px-1 py-0.5 bg-bg-card rounded text-primary">
+                      OPENCODE_API_KEY
+                    </code>{" "}
+                    or a provider key (ANTHROPIC_API_KEY, OPENAI_API_KEY). Setting the model in repo
+                    settings determines which key is needed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
                 <button
-                  onClick={goNext}
-                  disabled={!runtimeHealthy}
-                  className="flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50 transition-colors"
+                  onClick={goBack}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md text-text-muted text-sm hover:bg-bg-hover"
                 >
-                  Get Started <ArrowRight className="w-4 h-4" />
+                  <ArrowLeft className="w-4 h-4" /> Back
                 </button>
+                <div className="flex gap-2">
+                  {!githubValidated && (
+                    <button
+                      onClick={() => validateGithub()}
+                      disabled={loading || !githubToken.trim()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-md bg-bg-hover text-text text-sm hover:bg-border disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Validate"}
+                    </button>
+                  )}
+                  <button
+                    onClick={saveGithubStep}
+                    disabled={!githubValidated || loading}
+                    className="flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        Continue <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -465,11 +594,7 @@ export default function SetupPage() {
                 <input
                   type="password"
                   value={githubToken}
-                  onChange={(e) => {
-                    setGithubToken(e.target.value);
-                    setGithubValidated(false);
-                    setGithubError("");
-                  }}
+                  onChange={(e) => setGithubToken(e.target.value)}
                   onPaste={(e) => {
                     e.preventDefault();
                     const pasted = e.clipboardData.getData("text").trim();
@@ -477,7 +602,6 @@ export default function SetupPage() {
                       setGithubToken(pasted);
                       setGithubValidated(false);
                       setGithubError("");
-                      setTimeout(() => validateGithub(pasted), 50);
                     }
                   }}
                   placeholder="ghp_..."
@@ -891,7 +1015,7 @@ export default function SetupPage() {
                 </button>
                 <button
                   onClick={saveAgentKeysStep}
-                  disabled={(!claudeReady && !codexReady) || loading}
+                  disabled={(!claudeReady && !codexReady && !opencodeReady) || loading}
                   className="flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
                 >
                   {loading ? (

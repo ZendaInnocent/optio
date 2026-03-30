@@ -18,9 +18,15 @@ export function parseOpencodeEvent(
   line: string,
   taskId: string,
 ): { entries: AgentLogEntry[]; sessionId?: string } {
+  // Handle SSE format: "data: {json}\n" or "data: {json}"
+  let jsonStr = line;
+  if (line.startsWith("data:")) {
+    jsonStr = line.slice(5).trim();
+  }
+
   let event: any;
   try {
-    event = JSON.parse(line);
+    event = JSON.parse(jsonStr);
   } catch {
     // Not JSON — raw text from shell/git
     if (!line.trim()) return { entries: [] };
