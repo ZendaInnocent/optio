@@ -20,6 +20,9 @@ export interface RepoRecord {
   claudeContextWindow: string | null;
   claudeThinking: boolean;
   claudeEffort: string | null;
+  opencodeModel: string | null;
+  opencodeTemperature: number | null;
+  opencodeTopP: number | null;
   maxTurnsCoding: number | null;
   maxTurnsReview: number | null;
   autoResume: boolean;

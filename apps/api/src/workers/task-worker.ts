@@ -13,6 +13,7 @@ import {
 import { getAdapter } from "@optio/agent-adapters";
 import { parseClaudeEvent } from "../services/agent-event-parser.js";
 import { parseCodexEvent } from "../services/codex-event-parser.js";
+import { parseOpencodeEvent } from "../services/opencode-event-parser.js";
 import { checkExistingPr } from "../services/pr-detection-service.js";
 import { db } from "../db/client.js";
 import { tasks } from "../db/schema.js";
@@ -468,7 +469,9 @@ export function startTaskWorker() {
             const parsed =
               task.agentType === "codex"
                 ? parseCodexEvent(line, taskId)
-                : parseClaudeEvent(line, taskId);
+                : task.agentType === "opencode"
+                  ? parseOpencodeEvent(line, taskId)
+                  : parseClaudeEvent(line, taskId);
             if (parsed.sessionId && !sessionId) {
               sessionId = parsed.sessionId;
               await taskService.updateTaskSession(taskId, sessionId);
