@@ -1,15 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, KeyRound, Globe, FolderGit2, Filter } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  KeyRound,
+  Globe,
+  FolderGit2,
+  Filter,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
+
+const AGENT_REQUIREMENTS: Record<string, string[]> = {
+  "claude-code": ["ANTHROPIC_API_KEY"],
+  codex: ["OPENAI_API_KEY"],
+  opencode: [],
+};
 
 export default function SecretsPage() {
   usePageTitle("Secrets");
   const [secrets, setSecrets] = useState<any[]>([]);
   const [repos, setRepos] = useState<any[]>([]);
+  const [optioSettings, setOptioSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", value: "", scope: "global" });
@@ -25,10 +42,38 @@ export default function SecretsPage() {
       .finally(() => setLoading(false));
   };
 
+  const requiredSecrets = useMemo(() => {
+    const required = new Set<string>();
+    if (optioSettings?.agents) {
+      for (const agent of optioSettings.agents) {
+        if (agent.enabled && AGENT_REQUIREMENTS[agent.type]) {
+          for (const secret of AGENT_REQUIREMENTS[agent.type]) {
+            required.add(secret);
+          }
+        }
+      }
+    }
+    return Array.from(required);
+  }, [optioSettings]);
+
+  const secretNames = useMemo(() => new Set(secrets.map((s) => s.name)), [secrets]);
+
+  const missingSecrets = useMemo(
+    () => requiredSecrets.filter((s) => !secretNames.has(s)),
+    [requiredSecrets, secretNames],
+  );
+
+  const presentSecrets = useMemo(
+    () => requiredSecrets.filter((s) => secretNames.has(s)),
+    [requiredSecrets, secretNames],
+  );
+
   useEffect(() => {
-    api
-      .listRepos()
-      .then((res) => setRepos(res.repos))
+    Promise.all([api.listRepos(), api.getOptioSettings()])
+      .then(([reposRes, settingsRes]) => {
+        setRepos(reposRes.repos);
+        setOptioSettings(settingsRes.settings);
+      })
       .catch(() => {});
     loadSecrets();
   }, []);
@@ -73,8 +118,45 @@ export default function SecretsPage() {
     return repo?.fullName ?? scope;
   };
 
-  /** Unique scopes present in the current secrets list (for filter dropdown) */
-  const uniqueScopes = Array.from(new Set(secrets.map((s) => s.scope)));
+  const renderRequiredSecretsBanner = () => {
+    if (!optioSettings?.agents || requiredSecrets.length === 0) return null;
+
+    return (
+      <div className="mb-6 p-4 rounded-xl border border-border/50 bg-bg-card">
+        <h2 className="text-sm font-medium mb-3">Required for enabled agents</h2>
+        <div className="space-y-2">
+          {presentSecrets.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <span className="text-text-muted">Configured:</span>
+              {presentSecrets.map((secret) => (
+                <span
+                  key={secret}
+                  className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-xs"
+                >
+                  {secret}
+                </span>
+              ))}
+            </div>
+          )}
+          {missingSecrets.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+              <span className="text-text-muted">Missing:</span>
+              {missingSecrets.map((secret) => (
+                <span
+                  key={secret}
+                  className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-xs"
+                >
+                  {secret}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -150,6 +232,9 @@ export default function SecretsPage() {
           </div>
         </form>
       )}
+
+      {/* Required secrets banner */}
+      {renderRequiredSecretsBanner()}
 
       {/* Scope filter */}
       <div className="flex items-center gap-2 mb-4">
