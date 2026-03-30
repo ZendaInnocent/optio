@@ -768,9 +768,13 @@ function AuthenticationSettings() {
 }
 
 function AgentConfiguration() {
-  const [agents, setAgents] = useState<
-    Array<{ type: string; enabled: boolean; requiredSecrets: string[] }>
-  >([]);
+  const defaultAgents = [
+    { type: "claude-code", enabled: false, requiredSecrets: ["ANTHROPIC_API_KEY"] },
+    { type: "codex", enabled: false, requiredSecrets: ["OPENAI_API_KEY"] },
+    { type: "opencode", enabled: true, requiredSecrets: [] },
+  ];
+
+  const [agents, setAgents] = useState(defaultAgents);
   const [defaultAgent, setDefaultAgent] = useState("opencode");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -780,8 +784,12 @@ function AgentConfiguration() {
       .getOptioSettings()
       .then((res) => {
         const s = res.settings;
-        setAgents(s.agents || []);
-        setDefaultAgent(s.defaultAgent || "claude-code");
+        if (s.agents && s.agents.length > 0) {
+          setAgents(s.agents);
+        }
+        if (s.defaultAgent) {
+          setDefaultAgent(s.defaultAgent);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -850,7 +858,7 @@ function AgentConfiguration() {
                     type="checkbox"
                     checked={isEnabled}
                     onChange={() => handleToggle(type)}
-                    className="w-4 h-4 rounded"
+                    className="w-4 h-4 rounded cursor-pointer"
                   />
                   <div>
                     <p className="text-sm font-medium">{def.name}</p>
@@ -869,7 +877,7 @@ function AgentConfiguration() {
                     isDefault
                       ? "bg-primary text-white"
                       : isEnabled
-                        ? "bg-primary/10 text-primary hover:bg-primary/20"
+                        ? "bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
                         : "bg-bg text-text-muted cursor-not-allowed"
                   }`}
                 >
@@ -1156,6 +1164,15 @@ export default function SettingsPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-8">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+
+      {/* Agent Configuration */}
+      <section>
+        <h2 className="text-sm font-medium text-text-muted mb-3 flex items-center gap-2">
+          <Bot className="w-4 h-4" />
+          Agent Configuration
+        </h2>
+        <AgentConfiguration />
+      </section>
 
       {/* Optio Agent Settings */}
       <section>

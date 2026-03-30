@@ -22,6 +22,7 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...opts,
     headers,
+    credentials: "same-origin",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

@@ -41,17 +41,17 @@ export const AGENT_DEFINITIONS: Record<
 > = {
   "claude-code": {
     name: "Claude Code",
-    description: "Anthropic's Claude for local development",
+    description: "Anthropic's Claude Code",
     requiredSecrets: ["ANTHROPIC_API_KEY"],
   },
   codex: {
     name: "Codex",
-    description: "OpenAI's Codex for local development",
+    description: "OpenAI's Codex Coding Agent",
     requiredSecrets: ["OPENAI_API_KEY"],
   },
   opencode: {
     name: "OpenCode",
-    description: "OpenCode AI for local development (no API key needed)",
+    description: "OpenCode AI Coding Agent (no API key needed)",
     requiredSecrets: [],
   },
 };

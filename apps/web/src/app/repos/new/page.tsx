@@ -20,20 +20,19 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-const STEPS = [
+const TABS = [
   { id: "repo", label: "Repository" },
   { id: "image", label: "Container" },
   { id: "agent", label: "Agent" },
   { id: "review", label: "PR Lifecycle" },
 ] as const;
 
-type StepId = (typeof STEPS)[number]["id"];
+type TabId = (typeof TABS)[number]["id"];
 
 export default function NewRepoPage() {
   usePageTitle("Add Repository");
   const router = useRouter();
-  const [stepIndex, setStepIndex] = useState(0);
-  const currentStep = STEPS[stepIndex];
+  const [activeTab, setActiveTab] = useState<TabId>("repo");
 
   // Step 1: Repo
   const [repoUrl, setRepoUrl] = useState("");
@@ -142,35 +141,15 @@ export default function NewRepoPage() {
       toast.success(`${fullName} added successfully`);
       router.push(`/repos/${repoId}`);
     } catch (err) {
-      toast.error("Failed to create repository");
+      console.error("Create repo error:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to create repository");
     } finally {
       setCreating(false);
     }
   };
 
-  const canAdvance = (): boolean => {
-    switch (currentStep.id) {
-      case "repo":
-        return validated;
-      case "image":
-      case "agent":
-      case "review":
-        return true;
-      default:
-        return true;
-    }
-  };
-
-  const next = () => {
-    if (stepIndex < STEPS.length - 1) {
-      setStepIndex(stepIndex + 1);
-    } else {
-      handleCreate();
-    }
-  };
-
-  const back = () => {
-    if (stepIndex > 0) setStepIndex(stepIndex - 1);
+  const canSubmit = (): boolean => {
+    return validated;
   };
 
   const inputClass =
@@ -188,33 +167,27 @@ export default function NewRepoPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Add Repository</h1>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-1 mb-8">
-        {STEPS.map((step, i) => (
-          <div key={step.id} className="flex items-center gap-1 flex-1">
-            <button
-              onClick={() => i < stepIndex && setStepIndex(i)}
-              disabled={i > stepIndex}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                i === stepIndex
-                  ? "bg-primary text-white"
-                  : i < stepIndex
-                    ? "bg-primary/10 text-primary cursor-pointer hover:bg-primary/20"
-                    : "bg-bg-hover text-text-muted",
-              )}
-            >
-              {i < stepIndex ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
-              {step.label}
-            </button>
-            {i < STEPS.length - 1 && <div className="flex-1 h-px bg-border mx-1" />}
-          </div>
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-border mb-6">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "px-5 py-3 text-[13px] font-medium border-b-2 transition-colors",
+              activeTab === tab.id
+                ? "border-primary text-text"
+                : "border-transparent text-text-muted hover:text-text",
+            )}
+          >
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* Step content */}
+      {/* Tab content */}
       <div className="space-y-6">
-        {currentStep.id === "repo" && (
+        {activeTab === "repo" && (
           <RepoStep
             repoUrl={repoUrl}
             setRepoUrl={setRepoUrl}
@@ -225,11 +198,12 @@ export default function NewRepoPage() {
             validating={validating}
             validationError={validationError}
             onValidate={validateRepo}
+            onContinue={() => setActiveTab("image")}
             inputClass={inputClass}
           />
         )}
 
-        {currentStep.id === "image" && (
+        {activeTab === "image" && (
           <ImageStep
             imagePreset={imagePreset}
             setImagePreset={setImagePreset}
@@ -244,7 +218,7 @@ export default function NewRepoPage() {
           />
         )}
 
-        {currentStep.id === "agent" && (
+        {activeTab === "agent" && (
           <AgentStep
             claudeModel={claudeModel}
             setClaudeModel={setClaudeModel}
@@ -263,7 +237,7 @@ export default function NewRepoPage() {
           />
         )}
 
-        {currentStep.id === "review" && (
+        {activeTab === "review" && (
           <ReviewStep
             reviewEnabled={reviewEnabled}
             setReviewEnabled={setReviewEnabled}
@@ -283,32 +257,20 @@ export default function NewRepoPage() {
         )}
       </div>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t border-border/50">
+      {/* Create button */}
+      <div className="flex justify-end mt-8 pt-6 border-t border-border/50">
         <button
-          onClick={back}
-          disabled={stepIndex === 0}
-          className="flex items-center gap-2 px-4 py-2 rounded-md text-sm text-text-muted hover:bg-bg-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-
-        <button
-          onClick={next}
-          disabled={!canAdvance() || creating}
+          onClick={handleCreate}
+          disabled={!canSubmit() || creating}
           className="flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50 transition-colors"
         >
           {creating ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" /> Creating...
             </>
-          ) : stepIndex === STEPS.length - 1 ? (
-            <>
-              <Check className="w-4 h-4" /> Create Repository
-            </>
           ) : (
             <>
-              Continue <ArrowRight className="w-4 h-4" />
+              <Check className="w-4 h-4" /> Create Repository
             </>
           )}
         </button>
@@ -329,6 +291,7 @@ function RepoStep({
   validating,
   validationError,
   onValidate,
+  onContinue,
   inputClass,
 }: {
   repoUrl: string;
@@ -340,6 +303,7 @@ function RepoStep({
   validating: boolean;
   validationError: string;
   onValidate: () => void;
+  onContinue: () => void;
   inputClass: string;
 }) {
   return (
@@ -412,6 +376,14 @@ function RepoStep({
               Branch: <strong>{defaultBranch}</strong>
             </span>
             <span>{isPrivate ? "Private" : "Public"}</span>
+          </div>
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={onContinue}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors"
+            >
+              Continue <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
