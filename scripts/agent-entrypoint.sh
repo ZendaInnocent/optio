@@ -70,7 +70,7 @@ case "${OPTIO_AGENT_TYPE}" in
     ;;
   opencode)
     echo "[optio] Running Opencode AI..."
-    opencode --prompt "${OPTIO_PROMPT}" --json
+    opencode run "${OPTIO_PROMPT}" --format json
     ;;
   *)
     echo "[optio] Unknown agent type: ${OPTIO_AGENT_TYPE}"
