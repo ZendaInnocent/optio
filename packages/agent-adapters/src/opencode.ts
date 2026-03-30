@@ -28,14 +28,6 @@ export class OpencodeAdapter implements AgentAdapter {
   validateSecrets(availableSecrets: string[]): { valid: boolean; missing: string[] } {
     const required = ["GITHUB_TOKEN"];
     const missing = required.filter((s) => !availableSecrets.includes(s));
-
-    // OpenCode requires at least one AI authentication key
-    const aiKeys = ["OPENCODE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
-    const hasAiKey = aiKeys.some((key) => availableSecrets.includes(key));
-    if (!hasAiKey) {
-      missing.push(...aiKeys);
-    }
-
     return { valid: missing.length === 0, missing };
   }
 

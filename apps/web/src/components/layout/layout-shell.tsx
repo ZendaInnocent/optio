@@ -4,7 +4,6 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { GlobalWebSocketProvider } from "./ws-provider";
-import { SetupCheck } from "./setup-check";
 import { ThemeProvider } from "./theme-provider";
 import { ThemedToaster } from "./themed-toaster";
 import { OptioChatPanel } from "@/components/optio-chat";
@@ -17,7 +16,6 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider>
-      {!isLogin && <SetupCheck />}
       {!isLogin && <GlobalWebSocketProvider />}
       {isSetup || isLogin ? (
         <main className="min-h-screen">{children}</main>

@@ -265,6 +265,9 @@ export const api = {
       steps: Record<string, { done: boolean; label: string }>;
     }>("/api/setup/status"),
 
+  skipSetup: () =>
+    request<{ skipped: boolean; error?: string }>("/api/setup/skip", { method: "POST" }),
+
   listUserRepos: (token: string) =>
     request<{
       repos: Array<{
@@ -305,6 +308,7 @@ export const api = {
     request<{
       valid: boolean;
       error?: string;
+      needsGithubToken?: boolean;
       repo?: { fullName: string; defaultBranch: string; isPrivate: boolean };
     }>("/api/setup/validate/repo", {
       method: "POST",
@@ -901,6 +905,8 @@ export const api = {
     enabledTools?: string[];
     confirmWrites?: boolean;
     maxTurns?: number;
+    agents?: any[];
+    defaultAgent?: string;
   }) =>
     request<{ settings: any }>("/api/optio/settings", {
       method: "PUT",

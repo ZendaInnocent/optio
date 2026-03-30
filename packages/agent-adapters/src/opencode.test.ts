@@ -15,45 +15,19 @@ describe("OpencodeAdapter", () => {
   });
 
   describe("validateSecrets", () => {
-    it("returns invalid when only GITHUB_TOKEN present without AI key", () => {
+    it("returns valid when GITHUB_TOKEN is present", () => {
       const result = adapter.validateSecrets(["GITHUB_TOKEN"]);
-      expect(result.valid).toBe(false);
-      // GITHUB_TOKEN is present, so it should NOT be in missing
-      expect(result.missing).not.toContain("GITHUB_TOKEN");
-      // None of the AI keys are present, so all should be listed as missing
-      expect(result.missing).toContain("OPENCODE_API_KEY");
-      expect(result.missing).toContain("ANTHROPIC_API_KEY");
-      expect(result.missing).toContain("OPENAI_API_KEY");
+      expect(result.valid).toBe(true);
+      expect(result.missing).toEqual([]);
     });
 
-    it("reports missing GITHUB_TOKEN and AI keys when none present", () => {
+    it("reports missing GITHUB_TOKEN", () => {
       const result = adapter.validateSecrets([]);
       expect(result.valid).toBe(false);
       expect(result.missing).toContain("GITHUB_TOKEN");
-      expect(result.missing).toContain("OPENCODE_API_KEY");
-      expect(result.missing).toContain("ANTHROPIC_API_KEY");
-      expect(result.missing).toContain("OPENAI_API_KEY");
     });
 
-    it("returns valid with GITHUB_TOKEN and OPENCODE_API_KEY", () => {
-      const result = adapter.validateSecrets(["GITHUB_TOKEN", "OPENCODE_API_KEY"]);
-      expect(result.valid).toBe(true);
-      expect(result.missing).toEqual([]);
-    });
-
-    it("returns valid with GITHUB_TOKEN and ANTHROPIC_API_KEY", () => {
-      const result = adapter.validateSecrets(["GITHUB_TOKEN", "ANTHROPIC_API_KEY"]);
-      expect(result.valid).toBe(true);
-      expect(result.missing).toEqual([]);
-    });
-
-    it("returns valid with GITHUB_TOKEN and OPENAI_API_KEY", () => {
-      const result = adapter.validateSecrets(["GITHUB_TOKEN", "OPENAI_API_KEY"]);
-      expect(result.valid).toBe(true);
-      expect(result.missing).toEqual([]);
-    });
-
-    it("returns valid with multiple AI keys", () => {
+    it("returns valid when additional secrets are present", () => {
       const result = adapter.validateSecrets([
         "GITHUB_TOKEN",
         "ANTHROPIC_API_KEY",

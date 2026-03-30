@@ -2,12 +2,19 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import * as optioSettingsService from "../services/optio-settings-service.js";
 
+const agentConfigInputSchema = z.object({
+  type: z.enum(["claude-code", "codex", "opencode"]),
+  enabled: z.boolean(),
+});
+
 const updateSettingsSchema = z.object({
   model: z.enum(["opus", "sonnet", "haiku"]).optional(),
   systemPrompt: z.string().optional(),
   enabledTools: z.array(z.string()).min(1, "At least one tool must be enabled").optional(),
   confirmWrites: z.boolean().optional(),
   maxTurns: z.number().int().min(5).max(50).optional(),
+  agents: z.array(agentConfigInputSchema).optional(),
+  defaultAgent: z.enum(["claude-code", "codex", "opencode"]).optional(),
 });
 
 export async function optioSettingsRoutes(app: FastifyInstance) {

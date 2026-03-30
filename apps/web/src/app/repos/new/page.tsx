@@ -95,6 +95,10 @@ export default function NewRepoPage() {
         setDefaultBranch(res.repo.defaultBranch);
         setIsPrivate(res.repo.isPrivate);
         setValidated(true);
+      } else if ((res as any).needsGithubToken) {
+        setValidationError(
+          "GitHub token required for private repositories. Add your token in Settings → Secrets.",
+        );
       } else {
         setValidationError(res.error || "Could not access repository");
       }
@@ -378,7 +382,17 @@ function RepoStep({
       {validationError && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-error/10 border border-error/20">
           <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
-          <p className="text-sm text-error">{validationError}</p>
+          <div className="flex-1">
+            <p className="text-sm text-error">{validationError}</p>
+            {validationError.includes("GitHub token") && (
+              <Link
+                href="/secrets"
+                className="text-sm text-primary hover:underline mt-1 inline-block"
+              >
+                Go to Secrets →
+              </Link>
+            )}
+          </div>
         </div>
       )}
 

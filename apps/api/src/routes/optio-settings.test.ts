@@ -23,6 +23,12 @@ const defaultSettings = {
   enabledTools: [],
   confirmWrites: true,
   maxTurns: 20,
+  agents: [
+    { type: "claude-code", enabled: false, requiredSecrets: ["ANTHROPIC_API_KEY"] },
+    { type: "codex", enabled: false, requiredSecrets: ["OPENAI_API_KEY"] },
+    { type: "opencode", enabled: true, requiredSecrets: [] },
+  ],
+  defaultAgent: "opencode" as const,
   workspaceId: null,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
@@ -204,6 +210,79 @@ describe("PUT /api/optio/settings", () => {
       method: "PUT",
       url: "/api/optio/settings",
       payload: { enabledTools: [] },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("updates agents configuration", async () => {
+    const updated = {
+      ...defaultSettings,
+      agents: [
+        { type: "claude-code", enabled: true, requiredSecrets: ["ANTHROPIC_API_KEY"] },
+        { type: "codex", enabled: true, requiredSecrets: ["OPENAI_API_KEY"] },
+        { type: "opencode", enabled: false, requiredSecrets: [] },
+      ],
+    };
+    mockUpsertSettings.mockResolvedValue(updated);
+
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/optio/settings",
+      payload: {
+        agents: [
+          { type: "claude-code", enabled: true },
+          { type: "codex", enabled: true },
+          { type: "opencode", enabled: false },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.settings.agents).toHaveLength(3);
+    expect(body.settings.agents?.[1].enabled).toBe(true);
+    expect(body.settings.agents?.[1].requiredSecrets).toEqual(["OPENAI_API_KEY"]);
+  });
+
+  it("updates default agent", async () => {
+    const updated = {
+      ...defaultSettings,
+      defaultAgent: "claude-code" as const,
+      agents: [
+        { type: "claude-code", enabled: true, requiredSecrets: ["ANTHROPIC_API_KEY"] },
+        { type: "codex", enabled: false, requiredSecrets: ["OPENAI_API_KEY"] },
+        { type: "opencode", enabled: true, requiredSecrets: [] },
+      ],
+    };
+    mockUpsertSettings.mockResolvedValue(updated);
+
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/optio/settings",
+      payload: { defaultAgent: "codex" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.settings.defaultAgent).toBe("claude-code");
+  });
+
+  it("rejects invalid agent type", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/optio/settings",
+      payload: { agents: [{ type: "invalid", enabled: true }] },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects invalid defaultAgent", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/optio/settings",
+      payload: { defaultAgent: "invalid" },
     });
 
     expect(res.statusCode).toBe(400);

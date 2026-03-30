@@ -580,6 +580,15 @@ export const optioSettings = pgTable(
     enabledTools: jsonb("enabled_tools").$type<string[]>().notNull().default([]), // empty = all enabled
     confirmWrites: boolean("confirm_writes").notNull().default(true),
     maxTurns: integer("max_turns").notNull().default(20),
+    agents: jsonb("agents")
+      .$type<Array<{ type: string; enabled: boolean }>>()
+      .notNull()
+      .default([
+        { type: "claude-code", enabled: true },
+        { type: "codex", enabled: false },
+        { type: "opencode", enabled: false },
+      ]),
+    defaultAgent: text("default_agent").notNull().default("claude-code"),
     workspaceId: uuid("workspace_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

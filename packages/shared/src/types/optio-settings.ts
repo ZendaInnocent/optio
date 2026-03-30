@@ -1,3 +1,11 @@
+export type AgentType = "claude-code" | "codex" | "opencode";
+
+export interface OptioAgentConfig {
+  type: AgentType;
+  enabled: boolean;
+  requiredSecrets: string[];
+}
+
 export interface OptioSettings {
   id: string;
   model: string; // "opus" | "sonnet" | "haiku"
@@ -5,6 +13,8 @@ export interface OptioSettings {
   enabledTools: string[];
   confirmWrites: boolean;
   maxTurns: number;
+  agents: OptioAgentConfig[];
+  defaultAgent: AgentType;
   workspaceId?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -16,7 +26,35 @@ export interface UpdateOptioSettingsInput {
   enabledTools?: string[];
   confirmWrites?: boolean;
   maxTurns?: number;
+  agents?: AgentConfigInput[];
+  defaultAgent?: AgentType;
 }
+
+export interface AgentConfigInput {
+  type: AgentType;
+  enabled: boolean;
+}
+
+export const AGENT_DEFINITIONS: Record<
+  AgentType,
+  { name: string; description: string; requiredSecrets: string[] }
+> = {
+  "claude-code": {
+    name: "Claude Code",
+    description: "Anthropic's Claude for local development",
+    requiredSecrets: ["ANTHROPIC_API_KEY"],
+  },
+  codex: {
+    name: "Codex",
+    description: "OpenAI's Codex for local development",
+    requiredSecrets: ["OPENAI_API_KEY"],
+  },
+  opencode: {
+    name: "OpenCode",
+    description: "OpenCode AI for local development (no API key needed)",
+    requiredSecrets: [],
+  },
+};
 
 /** Tool category for UI grouping */
 export interface OptioToolCategory {

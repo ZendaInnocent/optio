@@ -20,7 +20,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { OPTIO_TOOL_CATEGORIES, ALL_OPTIO_TOOL_NAMES } from "@optio/shared";
+import { OPTIO_TOOL_CATEGORIES, ALL_OPTIO_TOOL_NAMES, AGENT_DEFINITIONS } from "@optio/shared";
 
 function PromptTemplateEditor() {
   const [template, setTemplate] = useState("");
@@ -767,6 +767,133 @@ function AuthenticationSettings() {
   );
 }
 
+function AgentConfiguration() {
+  const [agents, setAgents] = useState<
+    Array<{ type: string; enabled: boolean; requiredSecrets: string[] }>
+  >([]);
+  const [defaultAgent, setDefaultAgent] = useState("opencode");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api
+      .getOptioSettings()
+      .then((res) => {
+        const s = res.settings;
+        setAgents(s.agents || []);
+        setDefaultAgent(s.defaultAgent || "claude-code");
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleToggle = (type: string) => {
+    setAgents((prev) => prev.map((a) => (a.type === type ? { ...a, enabled: !a.enabled } : a)));
+  };
+
+  const handleSetDefault = (type: string) => {
+    setDefaultAgent(type);
+    setAgents((prev) => prev.map((a) => (a.type === type ? { ...a, enabled: true } : a)));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.updateOptioSettings({
+        agents,
+        defaultAgent,
+      });
+      toast.success("Agent configuration saved");
+    } catch (err) {
+      toast.error("Failed to save", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-5 rounded-xl border border-border/50 bg-bg-card text-center text-text-muted text-sm">
+        <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading...
+      </div>
+    );
+  }
+
+  const agentTypes = ["claude-code", "codex", "opencode"] as const;
+
+  return (
+    <div className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-4">
+      <p className="text-xs text-text-muted">
+        Configure which AI agents are available. Default agent is used for all tasks unless
+        overridden.
+      </p>
+
+      <div className="space-y-2">
+        {agentTypes.map((type) => {
+          const def = AGENT_DEFINITIONS[type];
+          const config = agents.find((a) => a.type === type);
+          const isEnabled = config?.enabled ?? false;
+          const isDefault = defaultAgent === type;
+
+          return (
+            <div
+              key={type}
+              className={`p-3 rounded-lg border ${
+                isDefault ? "border-primary/50 bg-primary/5" : "border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={() => handleToggle(type)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">{def.name}</p>
+                    <p className="text-xs text-text-muted">{def.description}</p>
+                    {def.requiredSecrets.length > 0 && (
+                      <p className="text-[10px] text-warning mt-0.5">
+                        Requires: {def.requiredSecrets.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleSetDefault(type)}
+                  disabled={!isEnabled}
+                  className={`px-3 py-1 rounded-md text-xs ${
+                    isDefault
+                      ? "bg-primary text-white"
+                      : isEnabled
+                        ? "bg-primary/10 text-primary hover:bg-primary/20"
+                        : "bg-bg text-text-muted cursor-not-allowed"
+                  }`}
+                >
+                  {isDefault ? "Default" : "Set Default"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-1.5 rounded-md bg-primary text-white text-xs hover:bg-primary-hover disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Configuration"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OptioAgentSettings() {
   const [model, setModel] = useState("sonnet");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -784,7 +911,6 @@ function OptioAgentSettings() {
         const s = res.settings;
         setModel(s.model);
         setSystemPrompt(s.systemPrompt);
-        // Empty array means "all enabled" (default state)
         setEnabledTools(
           s.enabledTools && s.enabledTools.length > 0 ? s.enabledTools : [...ALL_OPTIO_TOOL_NAMES],
         );
@@ -802,7 +928,6 @@ function OptioAgentSettings() {
     }
     setSaving(true);
     try {
-      // If all tools are enabled, store empty array (meaning "all")
       const toolsToSave = enabledTools.length === ALL_OPTIO_TOOL_NAMES.length ? [] : enabledTools;
       await api.updateOptioSettings({
         model,

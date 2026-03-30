@@ -231,6 +231,18 @@ export default function SetupPage() {
     setLoading(false);
   };
 
+  const skipSetup = async () => {
+    setLoading(true);
+    try {
+      await api.skipSetup();
+      router.push("/");
+    } catch (err) {
+      toast.error("Failed to skip setup");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [oauthExpired, setOauthExpired] = useState(false);
 
   const checkOauthToken = async () => {
@@ -541,6 +553,13 @@ export default function SetupPage() {
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <div className="flex gap-2">
+                  <button
+                    onClick={skipSetup}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-md bg-bg-hover text-text-muted text-sm hover:bg-border disabled:opacity-50"
+                  >
+                    Skip for now
+                  </button>
                   {!githubValidated && (
                     <button
                       onClick={() => validateGithub()}

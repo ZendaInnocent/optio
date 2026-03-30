@@ -1,7 +1,32 @@
 import { eq, and, or, isNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { optioSettings } from "../db/schema.js";
-import type { OptioSettings, UpdateOptioSettingsInput } from "@optio/shared";
+import { AGENT_DEFINITIONS } from "@optio/shared";
+import type {
+  AgentType,
+  OptioAgentConfig,
+  OptioSettings,
+  UpdateOptioSettingsInput,
+} from "@optio/shared";
+
+interface StoredAgentConfig {
+  type: string;
+  enabled: boolean;
+}
+
+const DEFAULT_AGENTS_STORAGE: StoredAgentConfig[] = [
+  { type: "claude-code", enabled: false },
+  { type: "codex", enabled: false },
+  { type: "opencode", enabled: true },
+];
+
+function addRequiredSecrets(agents: StoredAgentConfig[]): OptioAgentConfig[] {
+  return agents.map((agent) => ({
+    type: agent.type as AgentType,
+    enabled: agent.enabled,
+    requiredSecrets: AGENT_DEFINITIONS[agent.type as AgentType]?.requiredSecrets ?? [],
+  }));
+}
 
 /**
  * Get settings for a workspace. Returns the settings row or sensible defaults
@@ -37,6 +62,8 @@ export async function getSettings(workspaceId?: string | null): Promise<OptioSet
     enabledTools: [],
     confirmWrites: true,
     maxTurns: 20,
+    agents: addRequiredSecrets(DEFAULT_AGENTS_STORAGE),
+    defaultAgent: "opencode" as AgentType,
     workspaceId: workspaceId ?? null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -68,6 +95,8 @@ export async function upsertSettings(
     if (input.enabledTools !== undefined) updates.enabledTools = input.enabledTools;
     if (input.confirmWrites !== undefined) updates.confirmWrites = input.confirmWrites;
     if (input.maxTurns !== undefined) updates.maxTurns = input.maxTurns;
+    if (input.agents !== undefined) updates.agents = input.agents;
+    if (input.defaultAgent !== undefined) updates.defaultAgent = input.defaultAgent;
 
     const [row] = await db
       .update(optioSettings)
@@ -85,6 +114,8 @@ export async function upsertSettings(
         enabledTools: input.enabledTools ?? [],
         confirmWrites: input.confirmWrites ?? true,
         maxTurns: input.maxTurns ?? 20,
+        agents: input.agents ?? DEFAULT_AGENTS_STORAGE,
+        defaultAgent: input.defaultAgent ?? "opencode",
         workspaceId: workspaceId ?? undefined,
       })
       .returning();
@@ -93,6 +124,7 @@ export async function upsertSettings(
 }
 
 function mapRow(row: typeof optioSettings.$inferSelect): OptioSettings {
+  const storedAgents = row.agents ?? DEFAULT_AGENTS_STORAGE;
   return {
     id: row.id,
     model: row.model,
@@ -100,6 +132,8 @@ function mapRow(row: typeof optioSettings.$inferSelect): OptioSettings {
     enabledTools: row.enabledTools,
     confirmWrites: row.confirmWrites,
     maxTurns: row.maxTurns,
+    agents: addRequiredSecrets(storedAgents),
+    defaultAgent: (row.defaultAgent ?? "opencode") as AgentType,
     workspaceId: row.workspaceId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

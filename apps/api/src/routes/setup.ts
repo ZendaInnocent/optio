@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { checkRuntimeHealth } from "../services/container-service.js";
-import { listSecrets, retrieveSecret } from "../services/secret-service.js";
+import { listSecrets, retrieveSecret, storeSecret } from "../services/secret-service.js";
 import { isSubscriptionAvailable } from "../services/auth-service.js";
 
 export async function setupRoutes(app: FastifyInstance) {
@@ -8,6 +8,23 @@ export async function setupRoutes(app: FastifyInstance) {
   app.get("/api/setup/status", async (_req, reply) => {
     const secrets = await listSecrets();
     const secretNames = secrets.map((s) => s.name);
+
+    // Check if setup was skipped
+    const setupSkipped = secretNames.includes("SETUP_SKIPPED");
+    if (setupSkipped) {
+      reply.send({
+        isSetUp: true,
+        steps: {
+          runtime: { done: true, label: "Container runtime" },
+          githubToken: { done: true, label: "GitHub token" },
+          anthropicKey: { done: true, label: "Anthropic API key" },
+          openaiKey: { done: true, label: "OpenAI API key" },
+          codexAppServer: { done: true, label: "Codex app-server" },
+          anyAgentKey: { done: true, label: "At least one agent API key" },
+        },
+      });
+      return;
+    }
 
     const hasAnthropicKey = secretNames.includes("ANTHROPIC_API_KEY");
     const hasOpenAIKey = secretNames.includes("OPENAI_API_KEY");
@@ -179,28 +196,80 @@ export async function setupRoutes(app: FastifyInstance) {
       const [, owner, repo] = match;
       const headers: Record<string, string> = { "User-Agent": "Optio" };
       const effectiveToken = token ?? (await retrieveSecret("GITHUB_TOKEN").catch(() => null));
-      if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
 
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
-      if (res.ok) {
-        const data = (await res.json()) as {
+      // First check if repo exists (without auth) to determine if private
+      const unauthRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+      if (unauthRes.status === 404) {
+        // Repo not found at all (doesn't exist or was renamed)
+        return reply.send({ valid: false, error: "Repository not found" });
+      }
+
+      if (unauthRes.status === 200) {
+        const data = (await unauthRes.json()) as {
           full_name: string;
           default_branch: string;
           private: boolean;
         };
-        reply.send({
-          valid: true,
-          repo: {
-            fullName: data.full_name,
-            defaultBranch: data.default_branch,
-            isPrivate: data.private,
-          },
-        });
-      } else {
-        reply.send({ valid: false, error: `Repository not accessible (${res.status})` });
+
+        // Public repo - accessible without token
+        if (!data.private) {
+          return reply.send({
+            valid: true,
+            repo: {
+              fullName: data.full_name,
+              defaultBranch: data.default_branch,
+              isPrivate: data.private,
+            },
+          });
+        }
+
+        // Private repo - need token
+        if (!effectiveToken) {
+          return reply.send({
+            valid: false,
+            error: "GitHub token required for private repositories",
+            needsGithubToken: true,
+          });
+        }
+
+        // Verify token works for private repo
+        headers["Authorization"] = `Bearer ${effectiveToken}`;
+        const authRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+        if (authRes.ok) {
+          const authData = (await authRes.json()) as {
+            full_name: string;
+            default_branch: string;
+            private: boolean;
+          };
+          return reply.send({
+            valid: true,
+            repo: {
+              fullName: authData.full_name,
+              defaultBranch: authData.default_branch,
+              isPrivate: authData.private,
+            },
+          });
+        } else {
+          return reply.send({
+            valid: false,
+            error: "GitHub token does not have access to this repository",
+          });
+        }
       }
+
+      reply.send({ valid: false, error: `Repository check failed (${unauthRes.status})` });
     } catch (err) {
       reply.send({ valid: false, error: String(err) });
+    }
+  });
+
+  // Skip setup - marks system as configured without storing credentials
+  app.post("/api/setup/skip", async (_req, reply) => {
+    try {
+      await storeSecret("SETUP_SKIPPED", "true", "global");
+      reply.send({ skipped: true });
+    } catch (err) {
+      reply.status(500).send({ skipped: false, error: String(err) });
     }
   });
 }
