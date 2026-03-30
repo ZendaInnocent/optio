@@ -21,7 +21,11 @@ import { eq, sql } from "drizzle-orm";
 import * as taskService from "../services/task-service.js";
 import * as repoPool from "../services/repo-pool-service.js";
 import { publishEvent } from "../services/event-bus.js";
-import { resolveSecretsForTask, retrieveSecretWithFallback } from "../services/secret-service.js";
+import {
+  resolveSecretsForTask,
+  retrieveSecretWithFallback,
+  validateRequiredSecrets,
+} from "../services/secret-service.js";
 import { getPromptTemplate } from "../services/prompt-template-service.js";
 import { logger } from "../logger.js";
 
@@ -279,6 +283,28 @@ export function startTaskWorker() {
             : undefined,
           opencodeTopP: repoConfig?.opencodeTopP ? Number(repoConfig.opencodeTopP) : undefined,
         });
+
+        // ── Validate required secrets BEFORE running ───────────────────
+        if (agentConfig.requiredSecrets.length > 0) {
+          const missingSecrets = await validateRequiredSecrets(
+            agentConfig.requiredSecrets,
+            currentTask.repoUrl,
+            taskWorkspaceId,
+          );
+          if (missingSecrets.length > 0) {
+            log.error(
+              { missingSecrets },
+              "Missing required secrets — transitioning to needs_attention",
+            );
+            await taskService.transitionTask(
+              taskId,
+              TaskState.NEEDS_ATTENTION,
+              "missing_secrets",
+              `Missing required secrets: ${missingSecrets.join(", ")}. Please add them in Settings → Secrets.`,
+            );
+            return;
+          }
+        }
 
         // ── MCP servers & custom skills injection ────────────────────
         const { getMcpServersForTask, buildMcpJsonContent } =

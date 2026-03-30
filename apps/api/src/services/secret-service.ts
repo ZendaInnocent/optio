@@ -164,3 +164,33 @@ export async function resolveSecretsForTask(
   }
   return resolved;
 }
+
+export async function validateRequiredSecrets(
+  requiredSecrets: string[],
+  scope = "global",
+  workspaceId?: string | null,
+): Promise<string[]> {
+  const missing: string[] = [];
+  for (const name of requiredSecrets) {
+    const exists = await secretExists(name, scope, workspaceId);
+    if (!exists) {
+      missing.push(name);
+    }
+  }
+  return missing;
+}
+
+async function secretExists(
+  name: string,
+  scope = "global",
+  workspaceId?: string | null,
+): Promise<boolean> {
+  const conditions = [eq(secrets.name, name), eq(secrets.scope, scope)];
+  if (workspaceId) conditions.push(eq(secrets.workspaceId, workspaceId));
+
+  const [secret] = await db
+    .select({ id: secrets.id })
+    .from(secrets)
+    .where(and(...conditions));
+  return !!secret;
+}

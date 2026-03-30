@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the database module before importing the service
 vi.mock("../db/client.js", () => ({
@@ -36,6 +36,7 @@ describe("secret-service", () => {
   let listSecrets: typeof import("./secret-service.js").listSecrets;
   let deleteSecret: typeof import("./secret-service.js").deleteSecret;
   let resolveSecretsForTask: typeof import("./secret-service.js").resolveSecretsForTask;
+  let validateRequiredSecrets: typeof import("./secret-service.js").validateRequiredSecrets;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -45,6 +46,7 @@ describe("secret-service", () => {
     listSecrets = mod.listSecrets;
     deleteSecret = mod.deleteSecret;
     resolveSecretsForTask = mod.resolveSecretsForTask;
+    validateRequiredSecrets = mod.validateRequiredSecrets;
   });
 
   describe("encryption round-trip", () => {
@@ -351,6 +353,59 @@ describe("secret-service", () => {
 
       const result = await resolveSecretsForTask(["TOKEN"], "https://github.com/owner/repo");
       expect(result.TOKEN).toBe("repo-specific-token");
+    });
+  });
+
+  describe("validateRequiredSecrets", () => {
+    it("returns empty array when all required secrets exist", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: "secret-1" }]),
+        }),
+      });
+
+      const result = await validateRequiredSecrets(["ANTHROPIC_API_KEY", "GITHUB_TOKEN"], "global");
+      expect(result).toEqual([]);
+    });
+
+    it("returns missing secrets when secrets do not exist", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const result = await validateRequiredSecrets(
+        ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
+        "global",
+      );
+      expect(result).toEqual(["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]);
+    });
+
+    it("returns partial missing when some secrets exist", async () => {
+      let callCount = 0;
+      (db.select as any) = vi.fn().mockImplementation(() => ({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockImplementation(() => {
+            callCount++;
+            if (callCount === 1) {
+              return Promise.resolve([{ id: "exists" }]);
+            }
+            return Promise.resolve([]);
+          }),
+        }),
+      }));
+
+      const result = await validateRequiredSecrets(
+        ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
+        "global",
+      );
+      expect(result).toEqual(["OPENAI_API_KEY"]);
+    });
+
+    it("returns empty array for empty required secrets list", async () => {
+      const result = await validateRequiredSecrets([], "global");
+      expect(result).toEqual([]);
     });
   });
 });
