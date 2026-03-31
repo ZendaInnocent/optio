@@ -36,6 +36,7 @@ vi.mock("./event-bus.js", () => ({
 
 vi.mock("./repo-pool-service.js", () => ({
   getOrCreateRepoPod: vi.fn(),
+  resolveAgentImage: vi.fn().mockResolvedValue("optio-agent:latest"),
 }));
 
 vi.mock("../logger.js", () => ({
@@ -146,7 +147,7 @@ describe("interactive-session-service", () => {
         "https://github.com/o/r",
         "main",
         expect.any(Object),
-        undefined,
+        { customImage: "optio-agent:latest" },
         expect.any(Object),
       );
     });

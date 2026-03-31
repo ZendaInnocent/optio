@@ -3,8 +3,8 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { interactiveSessions, sessionPrs, repos, repoPods } from "../db/schema.js";
 import { publishEvent, publishSessionEvent } from "./event-bus.js";
-import { InteractiveSessionState, normalizeRepoUrl, type PresetImageId } from "@optio/shared";
-import { getOrCreateRepoPod } from "./repo-pool-service.js";
+import { InteractiveSessionState, normalizeRepoUrl } from "@optio/shared";
+import { getOrCreateRepoPod, resolveAgentImage } from "./repo-pool-service.js";
 import { logger } from "../logger.js";
 
 export async function createSession(input: { repoUrl: string; userId?: string }) {
@@ -29,18 +29,22 @@ export async function createSession(input: { repoUrl: string; userId?: string })
     // No token, that's fine
   }
 
-  const imageConfig = repoConfig
-    ? { preset: (repoConfig.imagePreset ?? "base") as PresetImageId }
-    : undefined;
-  const pod = await getOrCreateRepoPod(repoUrl, repoBranch, env, imageConfig, {
-    maxAgentsPerPod: repoConfig?.maxAgentsPerPod ?? 2,
-    maxPodInstances: repoConfig?.maxPodInstances ?? 1,
-    networkPolicy: repoConfig?.networkPolicy ?? "unrestricted",
-    cpuRequest: repoConfig?.cpuRequest,
-    cpuLimit: repoConfig?.cpuLimit,
-    memoryRequest: repoConfig?.memoryRequest,
-    memoryLimit: repoConfig?.memoryLimit,
-  });
+  const imageTag = await resolveAgentImage(repoUrl, repoConfig?.workspaceId);
+  const pod = await getOrCreateRepoPod(
+    repoUrl,
+    repoBranch,
+    env,
+    { customImage: imageTag },
+    {
+      maxAgentsPerPod: repoConfig?.maxAgentsPerPod ?? 2,
+      maxPodInstances: repoConfig?.maxPodInstances ?? 1,
+      networkPolicy: repoConfig?.networkPolicy ?? "unrestricted",
+      cpuRequest: repoConfig?.cpuRequest,
+      cpuLimit: repoConfig?.cpuLimit,
+      memoryRequest: repoConfig?.memoryRequest,
+      memoryLimit: repoConfig?.memoryLimit,
+    },
+  );
 
   // Generate a short ID for the branch name
   const shortId = randomUUID().slice(0, 8);

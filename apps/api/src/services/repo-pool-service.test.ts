@@ -2,21 +2,27 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
-vi.mock("../db/client.js", () => ({
-  db: {
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    orderBy: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    set: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    values: vi.fn().mockReturnThis(),
-    returning: vi.fn().mockResolvedValue([]),
-    delete: vi.fn().mockReturnThis(),
-  },
-}));
+vi.mock("../db/client.js", () => {
+  const dbMock: any = {};
+  const chainMethods = [
+    "select",
+    "from",
+    "where",
+    "orderBy",
+    "update",
+    "set",
+    "insert",
+    "values",
+    "delete",
+  ];
+  for (const key of chainMethods) {
+    dbMock[key] = vi.fn(() => dbMock);
+  }
+  // Terminal methods that return data
+  dbMock.limit = vi.fn();
+  dbMock.returning = vi.fn();
+  return { db: dbMock };
+});
 
 vi.mock("../db/schema.js", () => ({
   repoPods: {
@@ -37,6 +43,39 @@ vi.mock("../db/schema.js", () => ({
     lastPodId: "lastPodId",
     updatedAt: "updatedAt",
   },
+  customImages: {
+    id: "id",
+    workspaceId: "workspaceId",
+    repoUrl: "repoUrl",
+    imageTag: "imageTag",
+    buildStatus: "buildStatus",
+    builtAt: "builtAt",
+  },
+  repos: {
+    id: "id",
+    repoUrl: "repoUrl",
+    workspaceId: "workspaceId",
+    imagePreset: "imagePreset",
+  },
+  optioSettings: {
+    id: "id",
+    workspaceId: "workspaceId",
+    defaultLanguagePreset: "defaultLanguagePreset",
+  },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn((_col: any, _val: any) => ({ _eq: true })),
+  and: vi.fn((...args: any[]) => args.filter(Boolean)),
+  lt: vi.fn(),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: any[]) => ({
+    _sql: strings.join("?"),
+    _values: values,
+  })),
+  asc: vi.fn(),
+  desc: vi.fn(),
+  isNull: vi.fn(),
+  or: vi.fn(),
 }));
 
 const mockRuntimeCreate = vi.fn();
@@ -54,11 +93,17 @@ vi.mock("./container-service.js", () => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
+  eq: vi.fn((_col: any, _val: any) => ({ _eq: true })),
+  and: vi.fn((...args: any[]) => args.filter(Boolean)),
   lt: vi.fn(),
-  sql: vi.fn(),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: any[]) => ({
+    _sql: strings.join("?"),
+    _values: values,
+  })),
   asc: vi.fn(),
+  desc: vi.fn(),
+  isNull: vi.fn(),
+  or: vi.fn(),
 }));
 
 vi.mock("../logger.js", () => ({
@@ -72,6 +117,7 @@ vi.mock("../logger.js", () => ({
 import { db } from "../db/client.js";
 import {
   resolveImage,
+  resolveAgentImage,
   releaseRepoPodTask,
   cleanupIdleRepoPods,
   listRepoPods,
@@ -145,6 +191,96 @@ describe("resolveImage", () => {
   it("falls through to default for invalid preset", () => {
     delete process.env.OPTIO_AGENT_IMAGE;
     expect(resolveImage({ preset: "nonexistent" as any })).toBe("optio-agent:latest");
+  });
+});
+
+// ── resolveAgentImage ───────────────────────────────────────────────
+
+describe("resolveAgentImage", () => {
+  const origEnv = process.env.OPTIO_AGENT_IMAGE;
+
+  afterEach(() => {
+    if (origEnv !== undefined) {
+      process.env.OPTIO_AGENT_IMAGE = origEnv;
+    } else {
+      delete process.env.OPTIO_AGENT_IMAGE;
+    }
+  });
+
+  function setupDbMock() {
+    const dbMock = db as any;
+    dbMock.select.mockReturnValue(dbMock);
+    dbMock.from.mockReturnValue(dbMock);
+    dbMock.where.mockReturnValue(dbMock);
+    dbMock.orderBy.mockReturnValue(dbMock);
+    dbMock.limit.mockReset();
+    return dbMock;
+  }
+
+  it("returns custom image tag when repo has a successful build", async () => {
+    const mockCustomImage = {
+      id: "build-1",
+      imageTag: "optio/ws/custom-abc:latest",
+      buildStatus: "success",
+      repoUrl: "https://github.com/test/repo",
+      builtAt: new Date("2024-01-01"),
+    };
+
+    const dbMock = setupDbMock();
+    dbMock.limit.mockResolvedValueOnce([mockCustomImage]);
+
+    const result = await resolveAgentImage("https://github.com/test/repo");
+    expect(result).toBe("optio/ws/custom-abc:latest");
+  });
+
+  it("returns repo preset when no successful custom build exists", async () => {
+    const dbMock = setupDbMock();
+    dbMock.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ imagePreset: "node" }])
+      .mockResolvedValueOnce([{ defaultLanguagePreset: "python" }]);
+
+    const result = await resolveAgentImage("https://github.com/test/repo", "ws-1");
+    expect(dbMock.limit).toHaveBeenCalledTimes(2);
+    expect(result).toBe("optio-node:latest");
+  });
+
+  it("falls back to workspace default language preset when repo has no preset", async () => {
+    const dbMock = setupDbMock();
+    dbMock.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ imagePreset: null }])
+      .mockResolvedValueOnce([{ defaultLanguagePreset: "python" }]);
+
+    const result = await resolveAgentImage("https://github.com/test/repo", "ws-1");
+    expect(dbMock.limit).toHaveBeenCalledTimes(3);
+    expect(result).toBe("optio-python:latest");
+  });
+
+  it("falls back to env OPTIO_AGENT_IMAGE when no custom or workspace config", async () => {
+    process.env.OPTIO_AGENT_IMAGE = "my-env-image:latest";
+    const dbMock = setupDbMock();
+    dbMock.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ imagePreset: null }])
+      .mockResolvedValueOnce([{ defaultLanguagePreset: null }]);
+
+    const result = await resolveAgentImage("https://github.com/test/repo", "ws-1");
+    expect(dbMock.limit).toHaveBeenCalledTimes(3);
+    expect(result).toBe("my-env-image:latest");
+  });
+
+  it("falls back to DEFAULT_AGENT_IMAGE when nothing configured", async () => {
+    delete process.env.OPTIO_AGENT_IMAGE;
+    const dbMock = setupDbMock();
+    dbMock.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ imagePreset: null }])
+      .mockResolvedValueOnce([{ defaultLanguagePreset: null }]);
+
+    const result = await resolveAgentImage("https://github.com/test/repo", "ws-1");
+    expect(dbMock.limit).toHaveBeenCalledTimes(3);
+    expect(result).toBe("optio-agent:latest");
   });
 });
 

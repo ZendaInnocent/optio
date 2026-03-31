@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { eq, and, lt, sql, asc } from "drizzle-orm";
+import { eq, and, lt, sql, asc, isNull, desc, or } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { repoPods, tasks } from "../db/schema.js";
+import { repoPods, tasks, customImages, repos, optioSettings } from "../db/schema.js";
 import { getRuntime } from "./container-service.js";
 import type { ContainerHandle, ContainerSpec, ExecSession, RepoImageConfig } from "@optio/shared";
 import {
@@ -180,6 +180,77 @@ export function resolveImage(imageConfig?: RepoImageConfig): string {
     return PRESET_IMAGES[imageConfig.preset].tag;
   }
   return process.env.OPTIO_AGENT_IMAGE ?? DEFAULT_AGENT_IMAGE;
+}
+
+/**
+ * Resolve the agent image for a given repository with fallback logic.
+ *
+ * Priority chain:
+ * 1. Custom image built for this specific repo (buildStatus = 'success')
+ * 2. Repo's configured image preset
+ * 3. Workspace default language preset
+ * 4. Environment variable OPTIO_AGENT_IMAGE
+ * 5. Hardcoded DEFAULT_AGENT_IMAGE
+ */
+export async function resolveAgentImage(
+  repoUrl: string,
+  workspaceId?: string | null,
+): Promise<string> {
+  // 1. Check for a successful custom image build for this repo
+  const [customImage] = await db
+    .select({
+      imageTag: customImages.imageTag,
+    })
+    .from(customImages)
+    .where(
+      and(
+        eq(customImages.repoUrl, repoUrl),
+        eq(customImages.buildStatus, "success"),
+        workspaceId ? eq(customImages.workspaceId, workspaceId) : undefined,
+      ),
+    )
+    .orderBy(desc(customImages.builtAt))
+    .limit(1);
+
+  if (customImage?.imageTag) {
+    return customImage.imageTag;
+  }
+
+  // 2. Check repo's configured preset
+  const [repo] = await db
+    .select({
+      imagePreset: repos.imagePreset,
+    })
+    .from(repos)
+    .where(eq(repos.repoUrl, repoUrl))
+    .limit(1);
+
+  if (repo?.imagePreset && repo.imagePreset in PRESET_IMAGES) {
+    return PRESET_IMAGES[repo.imagePreset as keyof typeof PRESET_IMAGES].tag;
+  }
+
+  // 3. Check workspace default language preset
+  if (workspaceId) {
+    const [settings] = await db
+      .select({
+        defaultLanguagePreset: optioSettings.defaultLanguagePreset,
+      })
+      .from(optioSettings)
+      .where(eq(optioSettings.workspaceId, workspaceId))
+      .limit(1);
+
+    if (settings?.defaultLanguagePreset && settings.defaultLanguagePreset in PRESET_IMAGES) {
+      return PRESET_IMAGES[settings.defaultLanguagePreset as keyof typeof PRESET_IMAGES].tag;
+    }
+  }
+
+  // 4. Environment variable
+  if (process.env.OPTIO_AGENT_IMAGE) {
+    return process.env.OPTIO_AGENT_IMAGE;
+  }
+
+  // 5. Hardcoded default
+  return DEFAULT_AGENT_IMAGE;
 }
 
 async function createRepoPod(

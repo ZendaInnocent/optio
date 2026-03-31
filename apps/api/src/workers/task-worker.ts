@@ -402,14 +402,12 @@ export function startTaskWorker() {
         // Get or create a repo pod (with multi-pod scheduling)
         log.info("Getting repo pod");
         const isRetry = (task.retryCount ?? 0) > 0;
-        const imageConfig = repoConfig
-          ? { preset: (repoConfig.imagePreset ?? "base") as PresetImageId }
-          : undefined;
+        const imageTag = await repoPool.resolveAgentImage(task.repoUrl, task.workspaceId);
         const pod = await repoPool.getOrCreateRepoPod(
           task.repoUrl,
           task.repoBranch,
           allEnv,
-          imageConfig,
+          { customImage: imageTag },
           {
             preferredPodId: isRetry ? ((task as any).lastPodId ?? undefined) : undefined,
             maxAgentsPerPod,
