@@ -50,15 +50,20 @@
 
 ## Task Execution
 
-| Term            | Definition                                                                      | Aliases to avoid          |
-| --------------- | ------------------------------------------------------------------------------- | ------------------------- |
-| **PR URL**      | The GitHub pull request URL created by an agent upon completion                 | Pull request URL, PR link |
-| **Session ID**  | An identifier for a continuous agent conversation/session                       | Conversation ID, session  |
-| **Turn**        | A single exchange or iteration within an agent's execution                      | Iteration, step           |
-| **Token Usage** | The count of input and output tokens consumed by the AI model                   | Tokens, usage             |
-| **Cost (USD)**  | The monetary cost incurred by an agent's execution, in US dollars               | Price, fee, billing       |
-| **Tool Use**    | An action where the agent calls a built-in capability (Read, Write, Bash, etc.) | Tool call, action         |
-| **Tool Result** | The output returned from executing a tool use                                   | Tool output, result       |
+| Term                | Definition                                                                                                 | Aliases to avoid          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------- |
+| **Build Job**       | A Kubernetes Job that builds a custom Docker image for a workspace or repository                           | Image build, build task   |
+| **BuildJobManager** | The service class that submits build jobs, tracks status, and manages the lifecycle of custom image builds | Image builder manager     |
+| **Builder Image**   | A lightweight Docker image containing the Docker CLI and build script, used inside the build job           | Build container image     |
+| **DinD Sidecar**    | A Docker-in-Docker sidecar container that provides the Docker daemon for the builder container             | Docker sidecar            |
+| **Build Status**    | The current state of an image build (pending, building, success, failed, cancelled)                        | Build state               |
+| **PR URL**          | The GitHub pull request URL created by an agent upon completion                                            | Pull request URL, PR link |
+| **Session ID**      | An identifier for a continuous agent conversation/session                                                  | Conversation ID, session  |
+| **Turn**            | A single exchange or iteration within an agent's execution                                                 | Iteration, step           |
+| **Token Usage**     | The count of input and output tokens consumed by the AI model                                              | Tokens, usage             |
+| **Cost (USD)**      | The monetary cost incurred by an agent's execution, in US dollars                                          | Price, fee, billing       |
+| **Tool Use**        | An action where the agent calls a built-in capability (Read, Write, Bash, etc.)                            | Tool call, action         |
+| **Tool Result**     | The output returned from executing a tool use                                                              | Tool output, result       |
 
 ## Event Types (Structured Logs)
 

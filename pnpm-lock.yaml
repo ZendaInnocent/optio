@@ -59,6 +59,9 @@ importers:
       '@optio/container-runtime':
         specifier: workspace:*
         version: link:../../packages/container-runtime
+      '@optio/image-builder':
+        specifier: workspace:*
+        version: link:../../packages/image-builder
       '@optio/shared':
         specifier: workspace:*
         version: link:../../packages/shared

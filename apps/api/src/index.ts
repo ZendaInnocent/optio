@@ -12,6 +12,7 @@ import { startRepoCleanupWorker } from "./workers/repo-cleanup-worker.js";
 import { startPrWatcherWorker } from "./workers/pr-watcher-worker.js";
 import { startWebhookWorker } from "./workers/webhook-worker.js";
 import { startScheduleWorker } from "./workers/schedule-worker.js";
+import { startImageBuildWorker } from "./workers/image-build-worker.js";
 import { logger } from "./logger.js";
 
 const redisConnection = {
@@ -134,6 +135,9 @@ async function main() {
   const scheduleWorker = startScheduleWorker();
   logger.info("Schedule worker started");
 
+  const imageBuildWorker = startImageBuildWorker();
+  logger.info("Image build worker started");
+
   // Check if metrics-server is available
   checkMetricsServer().catch(() => {});
 
@@ -152,6 +156,7 @@ async function main() {
     await prWatcherWorker.close();
     await webhookWorker.close();
     await scheduleWorker.close();
+    await imageBuildWorker.close();
     await app.close();
     process.exit(0);
   };
