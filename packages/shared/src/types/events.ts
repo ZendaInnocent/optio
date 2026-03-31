@@ -9,7 +9,9 @@ export type WsEvent =
   | AuthFailedEvent
   | SessionCreatedEvent
   | SessionEndedEvent
-  | TaskCommentEvent;
+  | TaskCommentEvent
+  | BuildStatusChangedEvent
+  | BuildLogEvent;
 
 export interface TaskStateChangedEvent {
   type: "task:state_changed";
@@ -71,5 +73,22 @@ export interface TaskCommentEvent {
   type: "task:comment";
   taskId: string;
   commentId: string;
+  timestamp: string;
+}
+
+export interface BuildStatusChangedEvent {
+  type: "build:status_changed";
+  buildId: string;
+  fromStatus: "pending" | "building" | "success" | "failed" | "cancelled";
+  toStatus: "pending" | "building" | "success" | "failed" | "cancelled";
+  repoUrl: string | null;
+  imageTag: string;
+  timestamp: string;
+}
+
+export interface BuildLogEvent {
+  type: "build:log";
+  buildId: string;
+  content: string;
   timestamp: string;
 }

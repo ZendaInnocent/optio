@@ -5,6 +5,8 @@ import { customImages } from "../db/schema.js";
 import { buildQueue } from "../workers/image-build-worker.js";
 import type { ImageConfig } from "@optio/image-builder";
 import { logger } from "../logger.js";
+import { publishEvent } from "./event-bus.js";
+import type { BuildStatusChangedEvent } from "@optio/shared";
 
 export interface BuildJob {
   id: string;
@@ -75,6 +77,18 @@ export class BuildJobManager {
 
     logger.info({ customImageId, workspaceId, repoUrl, imageTag }, "Build job submitted");
 
+    // Publish WebSocket event
+    const statusEvent: BuildStatusChangedEvent = {
+      type: "build:status_changed",
+      buildId: customImageId,
+      fromStatus: "pending",
+      toStatus: "pending",
+      repoUrl,
+      imageTag,
+      timestamp: new Date().toISOString(),
+    };
+    await publishEvent(statusEvent);
+
     return {
       id: record.id,
       status: record.buildStatus as BuildJob["status"],
@@ -144,6 +158,18 @@ export class BuildJobManager {
         .update(customImages)
         .set({ buildStatus: "cancelled" })
         .where(eq(customImages.id, customImageId));
+
+      // Publish cancellation event
+      const cancelEvent: BuildStatusChangedEvent = {
+        type: "build:status_changed",
+        buildId: customImageId,
+        fromStatus: status as BuildStatusChangedEvent["fromStatus"],
+        toStatus: "cancelled",
+        repoUrl: null,
+        imageTag: "",
+        timestamp: new Date().toISOString(),
+      };
+      await publishEvent(cancelEvent);
 
       logger.info({ customImageId }, "Build cancelled");
       return true;

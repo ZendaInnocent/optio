@@ -18,6 +18,7 @@ import {
   FileText,
   GitBranch,
   Bot,
+  Hammer,
 } from "lucide-react";
 import { UserMenu } from "./user-menu";
 import { WorkspaceSwitcher } from "./workspace-switcher";
@@ -28,6 +29,7 @@ const MAIN_NAV = [
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/sessions", label: "Sessions", icon: Terminal },
   { href: "/repos", label: "Repos", icon: FolderGit2 },
+  { href: "/builds", label: "Builds", icon: Hammer },
   { href: "/cluster", label: "Cluster", icon: Server },
   { href: "/costs", label: "Costs", icon: DollarSign },
   { href: "/schedules", label: "Schedules", icon: Clock },

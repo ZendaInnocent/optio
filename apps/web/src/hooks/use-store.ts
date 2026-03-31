@@ -26,11 +26,37 @@ export interface WorkspaceSummary {
   role: string;
 }
 
+export interface BuildSummary {
+  id: string;
+  repoUrl: string | null;
+  imageTag: string;
+  agentTypes: string[];
+  languagePreset: string;
+  buildStatus: "pending" | "building" | "success" | "failed" | "cancelled";
+  builtAt: string | null;
+  createdAt: string;
+}
+
+export interface BuildSummary {
+  id: string;
+  repoUrl: string | null;
+  imageTag: string;
+  agentTypes: string[];
+  languagePreset: string;
+  buildStatus: "pending" | "building" | "success" | "failed" | "cancelled";
+  builtAt: string | null;
+  createdAt: string;
+}
+
 interface AppState {
   tasks: TaskSummary[];
   setTasks: (tasks: TaskSummary[]) => void;
   updateTask: (id: string, updates: Partial<TaskSummary>) => void;
   addTask: (task: TaskSummary) => void;
+  builds: BuildSummary[];
+  setBuilds: (builds: BuildSummary[]) => void;
+  updateBuild: (id: string, updates: Partial<BuildSummary>) => void;
+  addBuild: (build: BuildSummary) => void;
   notifications: Notification[];
   addNotification: (n: Notification) => void;
   dismissNotification: (id: string) => void;
@@ -70,6 +96,17 @@ export const useStore = create<AppState>((set) => ({
   addTask: (task) =>
     set((state) => ({
       tasks: [task, ...state.tasks],
+    })),
+
+  builds: [],
+  setBuilds: (builds) => set({ builds }),
+  updateBuild: (id, updates) =>
+    set((state) => ({
+      builds: state.builds.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+    })),
+  addBuild: (build) =>
+    set((state) => ({
+      builds: [build, ...state.builds],
     })),
 
   notifications: [],

@@ -83,6 +83,37 @@ export function useGlobalWebSocket() {
       });
     });
 
+    client.on("build:status_changed", (event) => {
+      const { buildId, toStatus, repoUrl, imageTag, timestamp } = event;
+      useStore.getState().updateBuild(buildId, {
+        buildStatus: toStatus,
+      });
+
+      // Show notification for terminal states
+      if (["success", "failed", "cancelled"].includes(toStatus)) {
+        const notificationType =
+          toStatus === "success" ? "success" : toStatus === "failed" ? "error" : "warning";
+        const title = `Build ${toStatus.replace("_", " ")}`;
+        const message = repoUrl
+          ? `Build for ${repoUrl} ${toStatus.replace("_", " ")}`
+          : `Workspace image build ${toStatus.replace("_", " ")}`;
+
+        useStore.getState().addNotification({
+          id: crypto.randomUUID(),
+          type: notificationType as "success" | "error" | "warning",
+          title,
+          message,
+          timestamp,
+        });
+
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification(`Optio: Build ${toStatus.replace("_", " ")}`, {
+            body: message,
+          });
+        }
+      }
+    });
+
     return () => {
       client.disconnect();
     };

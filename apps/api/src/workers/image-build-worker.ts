@@ -4,6 +4,8 @@ import { customImages } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { DockerfileGenerator } from "@optio/image-builder";
 import { logger } from "../logger.js";
+import { publishEvent } from "../services/event-bus.js";
+import type { BuildStatusChangedEvent } from "@optio/shared";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const connectionOpts = { url: redisUrl, maxRetriesPerRequest: null };
@@ -34,6 +36,18 @@ async function processBuildJob(job: any): Promise<void> {
     .update(customImages)
     .set({ buildStatus: "building" })
     .where(eq(customImages.id, customImageId));
+
+  // Publish building event
+  const buildingEvent: BuildStatusChangedEvent = {
+    type: "build:status_changed",
+    buildId: customImageId,
+    fromStatus: "pending",
+    toStatus: "building",
+    repoUrl: record.repoUrl,
+    imageTag: record.imageTag,
+    timestamp: new Date().toISOString(),
+  };
+  await publishEvent(buildingEvent);
 
   try {
     // Generate Dockerfile using DockerfileGenerator
@@ -176,6 +190,13 @@ async function processBuildJob(job: any): Promise<void> {
     throw new Error("Build job timed out after 30 minutes");
   } catch (error) {
     logger.error({ customImageId, error } as any, "Build job failed");
+
+    // Fetch record for repoUrl before updating
+    const [record] = await db
+      .select({ repoUrl: customImages.repoUrl, imageTag: customImages.imageTag })
+      .from(customImages)
+      .where(eq(customImages.id, customImageId));
+
     await db
       .update(customImages)
       .set({
@@ -183,6 +204,19 @@ async function processBuildJob(job: any): Promise<void> {
         buildLogs: error instanceof Error ? error.message : String(error),
       })
       .where(eq(customImages.id, customImageId));
+
+    // Publish failure event
+    const failureEvent: BuildStatusChangedEvent = {
+      type: "build:status_changed",
+      buildId: customImageId,
+      fromStatus: "building",
+      toStatus: "failed",
+      repoUrl: record?.repoUrl ?? null,
+      imageTag: record?.imageTag ?? "",
+      timestamp: new Date().toISOString(),
+    };
+    await publishEvent(failureEvent);
+
     throw error;
   }
 }
@@ -275,6 +309,12 @@ async function handleBuildSuccess(
 ) {
   logger.info({ customImageId, imageTag }, "Build succeeded");
 
+  // Fetch record for repoUrl
+  const [record] = await db
+    .select({ repoUrl: customImages.repoUrl, imageTag: customImages.imageTag })
+    .from(customImages)
+    .where(eq(customImages.id, customImageId));
+
   await db
     .update(customImages)
     .set({
@@ -282,6 +322,18 @@ async function handleBuildSuccess(
       builtAt: new Date(),
     })
     .where(eq(customImages.id, customImageId));
+
+  // Publish success event
+  const successEvent: BuildStatusChangedEvent = {
+    type: "build:status_changed",
+    buildId: customImageId,
+    fromStatus: "building",
+    toStatus: "success",
+    repoUrl: record?.repoUrl ?? null,
+    imageTag: record?.imageTag ?? imageTag,
+    timestamp: new Date().toISOString(),
+  };
+  await publishEvent(successEvent);
 
   logger.info({ customImageId, imageTag }, "Image build completed successfully");
 }
@@ -291,6 +343,12 @@ async function handleBuildSuccess(
  */
 async function handleBuildFailure(customImageId: string, namespace: string, jobName: string) {
   logger.error({ customImageId, jobName }, "Build failed, capturing logs");
+
+  // Fetch record for repoUrl before updating
+  const [record] = await db
+    .select({ repoUrl: customImages.repoUrl, imageTag: customImages.imageTag })
+    .from(customImages)
+    .where(eq(customImages.id, customImageId));
 
   try {
     const logs = await getBuilderLogs(jobName, namespace);
@@ -318,6 +376,18 @@ async function handleBuildFailure(customImageId: string, namespace: string, jobN
       .set({ buildStatus: "failed" })
       .where(eq(customImages.id, customImageId));
   }
+
+  // Publish failure event
+  const failureEvent: BuildStatusChangedEvent = {
+    type: "build:status_changed",
+    buildId: customImageId,
+    fromStatus: "building",
+    toStatus: "failed",
+    repoUrl: record?.repoUrl ?? null,
+    imageTag: record?.imageTag ?? "",
+    timestamp: new Date().toISOString(),
+  };
+  await publishEvent(failureEvent);
 
   // Clean up the job
   try {
