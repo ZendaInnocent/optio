@@ -304,8 +304,8 @@ async function getBuilderLogs(jobName: string, namespace: string): Promise<strin
 async function handleBuildSuccess(
   imageTag: string,
   customImageId: string,
-  _namespace: string,
-  _jobName: string,
+  namespace: string,
+  jobName: string,
 ) {
   logger.info({ customImageId, imageTag }, "Build succeeded");
 
@@ -334,6 +334,9 @@ async function handleBuildSuccess(
     timestamp: new Date().toISOString(),
   };
   await publishEvent(successEvent);
+
+  // Clean up ConfigMap and Job
+  await cleanupBuildArtifacts(customImageId, namespace, jobName);
 
   logger.info({ customImageId, imageTag }, "Image build completed successfully");
 }
@@ -389,11 +392,20 @@ async function handleBuildFailure(customImageId: string, namespace: string, jobN
   };
   await publishEvent(failureEvent);
 
-  // Clean up the job
+  // Clean up the job and ConfigMap
+  await cleanupBuildArtifacts(customImageId, namespace, jobName);
+}
+
+/**
+ * Clean up build artifacts (Job and ConfigMap).
+ */
+async function cleanupBuildArtifacts(customImageId: string, namespace: string, jobName: string) {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execFileAsync = promisify(execFile);
+
+  // Delete the Job
   try {
-    const { execFile } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execFileAsync = promisify(execFile);
     await execFileAsync("kubectl", [
       "delete",
       "job",
@@ -402,8 +414,25 @@ async function handleBuildFailure(customImageId: string, namespace: string, jobN
       namespace,
       "--ignore-not-found",
     ]);
-  } catch (cleanupErr) {
-    logger.warn({ jobName, error: cleanupErr } as any, "Failed to cleanup job");
+    logger.info({ jobName }, "Deleted build job");
+  } catch (err) {
+    logger.warn({ jobName, error: err }, "Failed to delete build job");
+  }
+
+  // Delete the ConfigMap
+  const configMapName = `dockerfile-${customImageId}`;
+  try {
+    await execFileAsync("kubectl", [
+      "delete",
+      "configmap",
+      configMapName,
+      "-n",
+      namespace,
+      "--ignore-not-found",
+    ]);
+    logger.info({ configMapName }, "Deleted ConfigMap");
+  } catch (err) {
+    logger.warn({ configMapName, error: err }, "Failed to delete ConfigMap");
   }
 }
 

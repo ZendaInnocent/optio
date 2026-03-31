@@ -114,6 +114,9 @@ export async function buildServer() {
     if (error.name === "InvalidTransitionError") {
       return reply.status(409).send({ error: error.message });
     }
+    if (error.name === "ImageRegistryError") {
+      return reply.status(502).send({ error: "Registry error", details: error.message });
+    }
     app.log.error(error);
     reply.status(500).send({ error: "Internal server error" });
   });

@@ -7,6 +7,7 @@ import { db } from "../db/client.js";
 import { customImages, workspaceMembers } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import type { ImageConfig } from "@optio/image-builder";
+import { ImageRegistry, ImageCleanupService } from "@optio/image-builder";
 
 // ─── Zod schemas ───
 
@@ -221,5 +222,72 @@ export async function customImagesRoutes(app: FastifyInstance) {
     }
 
     reply.send({ message: "Build cancelled" });
+  });
+
+  // GET /api/v1/registry/images — list images in the registry
+  app.get("/api/v1/registry/images", async (req, reply) => {
+    const workspaceId = req.user?.workspaceId;
+    const { pattern } = req.query as { pattern?: string };
+
+    const registry = new ImageRegistry({
+      registryUrl: process.env.REGISTRY_URL ?? "localhost:5000",
+    });
+
+    try {
+      const images = await registry.listImages(pattern ?? "");
+      reply.send({ images });
+    } catch (err) {
+      if (err instanceof (ImageRegistry as any).ImageRegistryError || (err as any).statusCode) {
+        return reply
+          .status(502)
+          .send({ error: "Failed to connect to registry", details: (err as Error).message });
+      }
+      throw err;
+    }
+  });
+
+  // DELETE /api/v1/registry/images — delete an image from the registry
+  app.delete("/api/v1/registry/images", async (req, reply) => {
+    const workspaceId = req.user?.workspaceId;
+    const { imageTag } = req.query as { imageTag: string };
+
+    if (!imageTag) {
+      return reply.status(400).send({ error: "imageTag query parameter is required" });
+    }
+
+    const registry = new ImageRegistry({
+      registryUrl: process.env.REGISTRY_URL ?? "localhost:5000",
+    });
+
+    try {
+      await registry.delete(imageTag);
+      reply.send({ message: "Image deleted", imageTag });
+    } catch (err) {
+      if (err instanceof (ImageRegistry as any).ImageRegistryError || (err as any).statusCode) {
+        return reply
+          .status(502)
+          .send({ error: "Failed to delete image", details: (err as Error).message });
+      }
+      throw err;
+    }
+  });
+
+  // POST /api/v1/registry/cleanup — trigger image cleanup
+  app.post("/api/v1/registry/cleanup", async (req, reply) => {
+    const workspaceId = req.user?.workspaceId;
+    const { keepLatest, imagePrefix } = req.body as { keepLatest?: number; imagePrefix?: string };
+
+    const cleanup = new ImageCleanupService({
+      registryUrl: process.env.REGISTRY_URL ?? "localhost:5000",
+      keepLatest: keepLatest ?? 5,
+      imagePrefix: imagePrefix ?? "optio",
+    });
+
+    try {
+      const result = await cleanup.cleanup();
+      reply.send({ result });
+    } catch (err) {
+      reply.status(500).send({ error: "Cleanup failed", details: (err as Error).message });
+    }
   });
 }

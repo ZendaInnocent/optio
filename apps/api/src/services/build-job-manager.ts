@@ -43,59 +43,76 @@ export class BuildJobManager {
     // Build the image tag: optio/{workspaceId}/custom-{id}:latest
     const imageTag = `optio/${workspaceId}/custom-${customImageId}:latest`;
 
-    // Create the record in custom_images table
-    const [record] = await db
-      .insert(customImages)
-      .values({
-        id: customImageId,
-        workspaceId,
+    try {
+      // Create the record in custom_images table
+      const [record] = await db
+        .insert(customImages)
+        .values({
+          id: customImageId,
+          workspaceId,
+          repoUrl,
+          imageTag,
+          agentTypes: config.agentTypes,
+          languagePreset: config.languagePreset,
+          customDockerfile: config.customDockerfile ?? null,
+          buildStatus: "pending",
+          buildLogs: null,
+          builtBy: userId,
+        })
+        .returning();
+
+      // Queue the actual build job
+      await buildQueue.add(
+        "build",
+        { customImageId },
+        {
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 30000,
+          },
+          removeOnComplete: 100,
+          removeOnFail: 500,
+        },
+      );
+
+      logger.info({ customImageId, workspaceId, repoUrl, imageTag }, "Build job submitted");
+
+      // Publish WebSocket event
+      const statusEvent: BuildStatusChangedEvent = {
+        type: "build:status_changed",
+        buildId: customImageId,
+        fromStatus: "pending",
+        toStatus: "pending",
         repoUrl,
         imageTag,
-        agentTypes: config.agentTypes,
-        languagePreset: config.languagePreset,
-        customDockerfile: config.customDockerfile ?? null,
-        buildStatus: "pending",
-        buildLogs: null,
-        builtBy: userId,
-      })
-      .returning();
+        timestamp: new Date().toISOString(),
+      };
+      await publishEvent(statusEvent);
 
-    // Queue the actual build job
-    await buildQueue.add(
-      "build",
-      { customImageId },
-      {
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 30000,
-        },
-        removeOnComplete: 100,
-        removeOnFail: 500,
-      },
-    );
-
-    logger.info({ customImageId, workspaceId, repoUrl, imageTag }, "Build job submitted");
-
-    // Publish WebSocket event
-    const statusEvent: BuildStatusChangedEvent = {
-      type: "build:status_changed",
-      buildId: customImageId,
-      fromStatus: "pending",
-      toStatus: "pending",
-      repoUrl,
-      imageTag,
-      timestamp: new Date().toISOString(),
-    };
-    await publishEvent(statusEvent);
-
-    return {
-      id: record.id,
-      status: record.buildStatus as BuildJob["status"],
-      logs: record.buildLogs ?? undefined,
-      startedAt: record.builtAt ?? undefined,
-      finishedAt: undefined,
-    };
+      return {
+        id: record.id,
+        status: record.buildStatus as BuildJob["status"],
+        logs: record.buildLogs ?? undefined,
+        startedAt: record.builtAt ?? undefined,
+        finishedAt: undefined,
+      };
+    } catch (err) {
+      logger.error({ customImageId, error: err }, "Failed to submit build job");
+      // If DB insert succeeded but queue failed, mark as failed
+      try {
+        await db
+          .update(customImages)
+          .set({
+            buildStatus: "failed",
+            buildLogs: `Failed to queue build: ${err instanceof Error ? err.message : String(err)}`,
+          })
+          .where(eq(customImages.id, customImageId));
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw err;
+    }
   }
 
   /**
