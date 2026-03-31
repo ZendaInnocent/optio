@@ -908,8 +908,115 @@ export const api = {
     maxTurns?: number;
     agents?: any[];
     defaultAgent?: string;
+    defaultAgentType?: string;
+    defaultLanguagePreset?: string;
   }) =>
     request<{ settings: any }>("/api/optio/settings", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  // Image Configuration
+  listAgents: () =>
+    request<{
+      agents: Array<{
+        id: string;
+        label: string;
+        description: string;
+        installCommand: string;
+        requiredSecrets: string[];
+      }>;
+    }>("/api/v1/agents"),
+
+  listLanguages: () =>
+    request<{
+      languages: Array<{
+        id: string;
+        label: string;
+        description: string;
+        languages: string[];
+      }>;
+    }>("/api/v1/languages"),
+
+  getImageConfig: (repoId: string) =>
+    request<{
+      config: {
+        agentTypes: string[];
+        languagePreset: string | null;
+        customDockerfile: string | null;
+      };
+      repo: { id: string; fullName: string; repoUrl: string };
+    }>(`/api/v1/repos/${repoId}/image-config`),
+
+  updateImageConfig: (
+    repoId: string,
+    data: {
+      agentTypes?: string[];
+      languagePreset?: string;
+      customDockerfile?: string | null;
+    },
+  ) =>
+    request<{ config: any }>(`/api/v1/repos/${repoId}/image-config`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  buildImage: (
+    repoId: string,
+    data: {
+      agentTypes: string[];
+      languagePreset: string;
+      customDockerfile?: string;
+    },
+  ) =>
+    request<{ buildId: string; status: string }>(`/api/v1/repos/${repoId}/build-image`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listBuilds: (params?: { status?: string; repo?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.repo) qs.set("repo", params.repo);
+    const query = qs.toString();
+    return request<{
+      builds: Array<{
+        id: string;
+        repoUrl: string;
+        imageTag: string;
+        agentTypes: string[];
+        languagePreset: string;
+        buildStatus: string;
+        builtAt: string | null;
+        createdAt: string;
+      }>;
+    }>(`/api/v1/builds${query ? `?${query}` : ""}`);
+  },
+
+  getBuildStatus: (buildId: string) => request<{ build: any }>(`/api/v1/builds/${buildId}`),
+
+  cancelBuild: (buildId: string) =>
+    request<{ message: string }>(`/api/v1/builds/${buildId}`, { method: "DELETE" }),
+
+  // Workspace Image Defaults
+  getWorkspaceImageDefaults: (workspaceId: string) =>
+    request<{
+      defaults: {
+        defaultAgentType: string;
+        defaultLanguagePreset: string;
+        agents: Array<{ type: string; enabled: boolean }>;
+      };
+    }>(`/api/workspaces/${workspaceId}/image-defaults`),
+
+  updateWorkspaceImageDefaults: (
+    workspaceId: string,
+    data: {
+      defaultAgentType?: string;
+      defaultLanguagePreset?: string;
+      agents?: Array<{ type: string; enabled: boolean }>;
+    },
+  ) =>
+    request<{ defaults: any }>(`/api/workspaces/${workspaceId}/image-defaults`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),

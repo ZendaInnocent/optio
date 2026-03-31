@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
-import { Loader2, Building2, Users, Trash2, UserPlus, Shield, Eye, Edit3 } from "lucide-react";
+import { Loader2, Building2, Users, Trash2, Shield, Eye, Edit3, Save } from "lucide-react";
 
 interface WorkspaceDetail {
   id: string;
@@ -334,6 +334,167 @@ function DangerZone() {
   );
 }
 
+function WorkspaceImageConfig() {
+  const [agents, setAgents] = useState<Array<{ id: string; label: string; description: string }>>(
+    [],
+  );
+  const [languages, setLanguages] = useState<
+    Array<{ id: string; label: string; description: string }>
+  >([]);
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const wsId = localStorage.getItem("optio_workspace_id");
+    if (!wsId) {
+      setLoading(false);
+      return;
+    }
+    Promise.all([api.listAgents(), api.listLanguages(), api.getWorkspace(wsId)])
+      .then(([agentsRes, langsRes, wsRes]) => {
+        setAgents(agentsRes.agents);
+        setLanguages(langsRes.languages);
+        setRole(wsRes.role);
+        // Load workspace defaults
+        return api.getOptioSettings();
+      })
+      .then((settingsRes) => {
+        const settings = settingsRes.settings;
+        if (settings.defaultAgentType) {
+          setSelectedAgents([settings.defaultAgentType]);
+        }
+        if (settings.defaultLanguagePreset) {
+          setSelectedLanguage(settings.defaultLanguagePreset);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    if (selectedAgents.length === 0) {
+      toast.error("At least one agent must be selected");
+      return;
+    }
+    if (!selectedLanguage) {
+      toast.error("A language preset must be selected");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.updateOptioSettings({
+        defaultAgentType: selectedAgents[0],
+        defaultLanguagePreset: selectedLanguage,
+        agents: agents.map((a) => ({
+          type: a.id,
+          enabled: selectedAgents.includes(a.id),
+        })),
+      });
+      toast.success("Default image configuration saved");
+    } catch (err) {
+      toast.error("Failed to save configuration", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleAgent = (agentId: string) => {
+    setSelectedAgents((prev) =>
+      prev.includes(agentId) ? prev.filter((id) => id !== agentId) : [...prev, agentId],
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="p-5 rounded-xl border border-border/50 bg-bg-card text-center text-text-muted text-sm">
+        <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-4">
+      <div>
+        <p className="text-xs text-text-muted mb-3">
+          These defaults are applied when a repository has no explicit image configuration.
+        </p>
+      </div>
+
+      {/* Agent Selection */}
+      <div>
+        <label className="block text-xs text-text-muted mb-2">Default Agents</label>
+        <div className="space-y-2">
+          {agents.map((agent) => (
+            <label
+              key={agent.id}
+              className="flex items-start gap-3 p-2.5 rounded-md border border-border hover:border-text-muted cursor-pointer text-sm transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={selectedAgents.includes(agent.id)}
+                onChange={() => toggleAgent(agent.id)}
+                className="mt-0.5 w-4 h-4 rounded"
+              />
+              <div>
+                <span className="font-medium">{agent.label}</span>
+                <p className="text-xs text-text-muted mt-0.5">{agent.description}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Language Preset */}
+      <div>
+        <label className="block text-xs text-text-muted mb-2">Default Language Preset</label>
+        <select
+          value={selectedLanguage}
+          onChange={(e) => setSelectedLanguage(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary"
+        >
+          <option value="">Select a preset...</option>
+          {languages.map((lang) => (
+            <option key={lang.id} value={lang.id}>
+              {lang.label}
+            </option>
+          ))}
+        </select>
+        {selectedLanguage && (
+          <p className="text-xs text-text-muted mt-1.5">
+            {languages.find((l) => l.id === selectedLanguage)?.description}
+          </p>
+        )}
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-1.5 rounded-md bg-primary text-white text-xs hover:bg-primary-hover disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-3.5 h-3.5" />
+              Save Defaults
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkspaceSettingsPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-8">
@@ -352,6 +513,12 @@ export default function WorkspaceSettingsPage() {
       <section>
         <h2 className="text-sm font-medium text-text-muted mb-3">Members</h2>
         <MemberManagement />
+      </section>
+
+      {/* Default Image Configuration */}
+      <section>
+        <h2 className="text-sm font-medium text-text-muted mb-3">Default Image Configuration</h2>
+        <WorkspaceImageConfig />
       </section>
 
       {/* Danger Zone */}

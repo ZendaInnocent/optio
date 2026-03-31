@@ -202,4 +202,144 @@ describe("api-client", () => {
       expect(result).toEqual({ cancelled: 2, total: 4 });
     });
   });
+
+  describe("image configuration", () => {
+    describe("listAgents", () => {
+      it("fetches agent catalog", async () => {
+        mockResponse({
+          agents: [
+            {
+              id: "claude-code",
+              label: "Claude Code",
+              description: "Anthropic's agent",
+              installCommand: "",
+              requiredSecrets: [],
+            },
+          ],
+        });
+        const result = await api.listAgents();
+        expect(result.agents).toHaveLength(1);
+        expect(result.agents[0].id).toBe("claude-code");
+        expect(fetchMock).toHaveBeenCalledWith("/api/v1/agents", expect.any(Object));
+      });
+    });
+
+    describe("listLanguages", () => {
+      it("fetches language presets", async () => {
+        mockResponse({
+          languages: [
+            {
+              id: "node",
+              label: "Node.js",
+              description: "Node.js preset",
+              languages: ["javascript", "typescript"],
+            },
+          ],
+        });
+        const result = await api.listLanguages();
+        expect(result.languages).toHaveLength(1);
+        expect(result.languages[0].id).toBe("node");
+      });
+    });
+
+    describe("getImageConfig", () => {
+      it("fetches image config for a repo", async () => {
+        mockResponse({
+          config: { agentTypes: ["claude-code"], languagePreset: "node", customDockerfile: null },
+          repo: { id: "repo-1", fullName: "test/repo", repoUrl: "https://github.com/test/repo" },
+        });
+        const result = await api.getImageConfig("repo-1");
+        expect(result.config.agentTypes).toEqual(["claude-code"]);
+        expect(result.config.languagePreset).toBe("node");
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/v1/repos/repo-1/image-config",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("updateImageConfig", () => {
+      it("sends PUT with image config data", async () => {
+        mockResponse({
+          config: { agentTypes: ["claude-code", "opencode"], languagePreset: "python" },
+        });
+        const result = await api.updateImageConfig("repo-1", {
+          agentTypes: ["claude-code", "opencode"],
+          languagePreset: "python",
+        });
+        expect(result.config.agentTypes).toEqual(["claude-code", "opencode"]);
+        const [url, opts] = fetchMock.mock.calls[0];
+        expect(url).toBe("/api/v1/repos/repo-1/image-config");
+        expect(opts.method).toBe("PUT");
+        const body = JSON.parse(opts.body);
+        expect(body.agentTypes).toEqual(["claude-code", "opencode"]);
+      });
+    });
+
+    describe("buildImage", () => {
+      it("sends POST to trigger image build", async () => {
+        mockResponse({ buildId: "build-123", status: "pending" });
+        const result = await api.buildImage("repo-1", {
+          agentTypes: ["claude-code"],
+          languagePreset: "node",
+        });
+        expect(result.buildId).toBe("build-123");
+        expect(result.status).toBe("pending");
+        const [url, opts] = fetchMock.mock.calls[0];
+        expect(url).toBe("/api/v1/repos/repo-1/build-image");
+        expect(opts.method).toBe("POST");
+      });
+    });
+
+    describe("listBuilds", () => {
+      it("fetches builds without params", async () => {
+        mockResponse({
+          builds: [
+            {
+              id: "build-1",
+              repoUrl: "https://github.com/test/repo",
+              imageTag: "optio-node:latest",
+              agentTypes: ["claude-code"],
+              languagePreset: "node",
+              buildStatus: "success",
+              builtAt: "2024-01-01T00:00:00Z",
+              createdAt: "2024-01-01T00:00:00Z",
+            },
+          ],
+        });
+        const result = await api.listBuilds();
+        expect(result.builds).toHaveLength(1);
+        expect(fetchMock).toHaveBeenCalledWith("/api/v1/builds", expect.any(Object));
+      });
+
+      it("appends query params when provided", async () => {
+        mockResponse({ builds: [] });
+        await api.listBuilds({ status: "success", repo: "https://github.com/test/repo" });
+        const url = fetchMock.mock.calls[0][0] as string;
+        expect(url).toContain("status=success");
+        expect(url).toContain("repo=");
+      });
+    });
+
+    describe("getBuildStatus", () => {
+      it("fetches build status by id", async () => {
+        mockResponse({ build: { id: "build-123", status: "building" } });
+        const result = await api.getBuildStatus("build-123");
+        expect(result.build.id).toBe("build-123");
+        expect(fetchMock).toHaveBeenCalledWith("/api/v1/builds/build-123", expect.any(Object));
+      });
+    });
+
+    describe("cancelBuild", () => {
+      it("sends DELETE to cancel build", async () => {
+        mockResponse({ message: "Build cancelled" });
+        const result = await api.cancelBuild("build-123");
+        expect(result.message).toBe("Build cancelled");
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/v1/builds/build-123",
+          expect.objectContaining({ method: "DELETE" }),
+        );
+      });
+    });
+  });
 });

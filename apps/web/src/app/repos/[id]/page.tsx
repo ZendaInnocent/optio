@@ -5,7 +5,6 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { api } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PRESET_IMAGES, type PresetImageId } from "@optio/shared";
 import {
   Loader2,
   FolderGit2,
@@ -23,6 +22,9 @@ import {
   Server,
   Sparkles,
   X,
+  Package,
+  RotateCcw,
+  Hammer,
 } from "lucide-react";
 import { formatRelativeTime, formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -92,6 +94,21 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [newSkillName, setNewSkillName] = useState("");
   const [newSkillDescription, setNewSkillDescription] = useState("");
   const [newSkillPrompt, setNewSkillPrompt] = useState("");
+
+  // Image Configuration
+  const [availableAgents, setAvailableAgents] = useState<
+    Array<{ id: string; label: string; description: string }>
+  >([]);
+  const [availableLanguages, setAvailableLanguages] = useState<
+    Array<{ id: string; label: string; description: string }>
+  >([]);
+  const [agentTypes, setAgentTypes] = useState<string[]>([]);
+  const [languagePreset, setLanguagePreset] = useState("");
+  const [dockerfileEditor, setDockerfileEditor] = useState("");
+  const [lastBuildStatus, setLastBuildStatus] = useState<string | null>(null);
+  const [lastBuildTime, setLastBuildTime] = useState<string | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [savingImageConfig, setSavingImageConfig] = useState(false);
 
   useEffect(() => {
     api
@@ -164,6 +181,33 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
     api
       .listSkills(repo.repoUrl)
       .then((res) => setSkills(res.skills))
+      .catch(() => {});
+  }, [repo?.id, repo?.repoUrl]);
+
+  // Fetch image configuration data
+  useEffect(() => {
+    if (!repo?.id) return;
+    Promise.all([
+      api.listAgents(),
+      api.listLanguages(),
+      api.getImageConfig(repo.id),
+      api.listBuilds({ repo: repo.repoUrl }),
+    ])
+      .then(([agentsRes, langsRes, configRes, buildsRes]) => {
+        setAvailableAgents(agentsRes.agents);
+        setAvailableLanguages(langsRes.languages);
+        setAgentTypes(configRes.config.agentTypes ?? []);
+        setLanguagePreset(configRes.config.languagePreset ?? imagePreset);
+        setDockerfileEditor(configRes.config.customDockerfile ?? "");
+        // Find the most recent build
+        const builds = buildsRes.builds
+          .filter((b) => b.repoUrl === repo.repoUrl)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        if (builds.length > 0) {
+          setLastBuildStatus(builds[0].buildStatus);
+          setLastBuildTime(builds[0].createdAt);
+        }
+      })
       .catch(() => {});
   }, [repo?.id, repo?.repoUrl]);
 
@@ -1264,43 +1308,92 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
       </section>
 
       {/* Image */}
-      <section className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-3">
-        <h2 className="text-sm font-medium">Container Image</h2>
-        <p className="text-xs text-text-muted">
-          Choose the base image for agent pods working on this repo.
-        </p>
-        <div className="grid gap-1.5">
-          {(
-            Object.entries(PRESET_IMAGES) as [
-              PresetImageId,
-              (typeof PRESET_IMAGES)[PresetImageId],
-            ][]
-          ).map(([key, img]) => (
-            <button
-              key={key}
-              onClick={() => setImagePreset(key)}
-              className={cn(
-                "flex items-start gap-3 p-2.5 rounded-md border text-left text-sm transition-colors",
-                imagePreset === key
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-text-muted bg-bg",
-              )}
-            >
-              <div
+      <section className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium flex items-center gap-2">
+              <Package className="w-4 h-4 text-primary" />
+              Container Image
+            </h2>
+            <p className="text-xs text-text-muted mt-1">
+              Configure the execution environment for agent pods working on this repo.
+            </p>
+          </div>
+          {lastBuildStatus && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-text-muted">Last build:</span>
+              <span
                 className={cn(
-                  "w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center",
-                  imagePreset === key ? "border-primary" : "border-border",
+                  "px-2 py-0.5 rounded-full font-medium",
+                  lastBuildStatus === "success"
+                    ? "bg-success/10 text-success"
+                    : lastBuildStatus === "failed"
+                      ? "bg-error/10 text-error"
+                      : lastBuildStatus === "building"
+                        ? "bg-warning/10 text-warning"
+                        : "bg-border text-text-muted",
                 )}
               >
-                {imagePreset === key && <div className="w-2 h-2 rounded-full bg-primary" />}
-              </div>
-              <div>
-                <span className="font-medium">{img.label}</span>
-                <p className="text-xs text-text-muted mt-0.5">{img.description}</p>
-              </div>
-            </button>
-          ))}
+                {lastBuildStatus}
+              </span>
+              {lastBuildTime && <span className="text-text-muted/60">{lastBuildTime}</span>}
+            </div>
+          )}
         </div>
+
+        {/* Agent Selection */}
+        <div>
+          <label className="block text-xs text-text-muted mb-2">Agents</label>
+          <div className="space-y-2">
+            {availableAgents.map((agent) => (
+              <label
+                key={agent.id}
+                className="flex items-start gap-3 p-2.5 rounded-md border border-border hover:border-text-muted cursor-pointer text-sm transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={agentTypes.includes(agent.id)}
+                  onChange={() => {
+                    setAgentTypes((prev) =>
+                      prev.includes(agent.id)
+                        ? prev.filter((id) => id !== agent.id)
+                        : [...prev, agent.id],
+                    );
+                  }}
+                  className="mt-0.5 w-4 h-4 rounded"
+                />
+                <div>
+                  <span className="font-medium">{agent.label}</span>
+                  <p className="text-xs text-text-muted mt-0.5">{agent.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Language Preset */}
+        <div>
+          <label className="block text-xs text-text-muted mb-2">Language Preset</label>
+          <select
+            value={languagePreset}
+            onChange={(e) => setLanguagePreset(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary"
+          >
+            <option value="">Select a preset...</option>
+            {availableLanguages.map((lang) => (
+              <option key={lang.id} value={lang.id}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+          {languagePreset && (
+            <p className="text-xs text-text-muted mt-1.5">
+              {availableLanguages.find((l) => l.id === languagePreset)?.description}
+            </p>
+          )}
+        </div>
+
+        {/* Extra packages */}
         <div>
           <label className="block text-xs text-text-muted mb-1">
             Extra apt packages (comma-separated)
@@ -1313,7 +1406,7 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
           />
         </div>
 
-        {/* Advanced toggle */}
+        {/* Advanced Toggle */}
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-xs text-primary hover:underline"
@@ -1347,15 +1440,18 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
                 include all tools the agent needs (git, node, claude-code, gh).
               </p>
               <textarea
-                value={customDockerfile}
-                onChange={(e) => setCustomDockerfile(e.target.value)}
-                rows={8}
+                value={dockerfileEditor}
+                onChange={(e) => {
+                  setDockerfileEditor(e.target.value);
+                  setCustomDockerfile(e.target.value);
+                }}
+                rows={10}
                 placeholder={
                   "FROM ubuntu:24.04\nRUN apt-get update && apt-get install -y git curl nodejs\nRUN npm install -g @anthropic-ai/claude-code\n# Add your custom tools here"
                 }
                 className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-xs font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 resize-y leading-relaxed"
               />
-              {customDockerfile && (
+              {dockerfileEditor && (
                 <p className="text-[10px] text-warning mt-1">
                   Custom Dockerfile is set — the preset image above will be ignored. You must
                   rebuild the image manually.
@@ -1364,6 +1460,97 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
         )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t border-border">
+          <button
+            onClick={async () => {
+              if (agentTypes.length === 0) {
+                toast.error("At least one agent must be selected");
+                return;
+              }
+              if (!languagePreset) {
+                toast.error("A language preset must be selected");
+                return;
+              }
+              setSavingImageConfig(true);
+              try {
+                await api.updateImageConfig(repo.id, {
+                  agentTypes,
+                  languagePreset,
+                  customDockerfile: dockerfileEditor || null,
+                });
+                toast.success("Image configuration saved");
+              } catch (err) {
+                toast.error("Failed to save image configuration", {
+                  description: err instanceof Error ? err.message : undefined,
+                });
+              } finally {
+                setSavingImageConfig(false);
+              }
+            }}
+            disabled={savingImageConfig}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-white text-xs hover:bg-primary-hover disabled:opacity-50"
+          >
+            {savingImageConfig ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5" />
+            )}
+            {savingImageConfig ? "Saving..." : "Save Config"}
+          </button>
+          <button
+            onClick={async () => {
+              if (agentTypes.length === 0) {
+                toast.error("At least one agent must be selected");
+                return;
+              }
+              if (!languagePreset) {
+                toast.error("A language preset must be selected");
+                return;
+              }
+              setBuilding(true);
+              try {
+                const res = await api.buildImage(repo.id, {
+                  agentTypes,
+                  languagePreset,
+                  customDockerfile: dockerfileEditor || undefined,
+                });
+                setLastBuildStatus("building");
+                setLastBuildTime(new Date().toISOString());
+                toast.success(`Build started (${res.buildId})`);
+              } catch (err) {
+                toast.error("Failed to start build", {
+                  description: err instanceof Error ? err.message : undefined,
+                });
+              } finally {
+                setBuilding(false);
+              }
+            }}
+            disabled={building}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-bg border border-border text-xs hover:bg-bg-hover disabled:opacity-50"
+          >
+            {building ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Hammer className="w-3.5 h-3.5" />
+            )}
+            {building ? "Building..." : "Build Now"}
+          </button>
+          <button
+            onClick={() => {
+              setAgentTypes([]);
+              setLanguagePreset("");
+              setDockerfileEditor("");
+              setCustomDockerfile("");
+              toast.info("Configuration reset");
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-text-muted text-xs hover:bg-bg-hover"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset
+          </button>
+        </div>
       </section>
 
       {/* Prompt override */}
