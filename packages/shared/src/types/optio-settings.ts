@@ -37,22 +37,25 @@ export interface AgentConfigInput {
 
 export const AGENT_DEFINITIONS: Record<
   AgentType,
-  { name: string; description: string; requiredSecrets: string[] }
+  { name: string; description: string; requiredSecrets: string[]; installCommand?: string }
 > = {
   "claude-code": {
     name: "Claude Code",
     description: "Anthropic's Claude Code",
     requiredSecrets: ["ANTHROPIC_API_KEY"],
+    installCommand: "npm install -g @anthropic-ai/claude-code",
   },
   codex: {
     name: "Codex",
     description: "OpenAI's Codex Coding Agent",
     requiredSecrets: ["OPENAI_API_KEY"],
+    installCommand: "npm install -g codex-cli",
   },
   opencode: {
     name: "OpenCode",
     description: "OpenCode AI Coding Agent (no API key needed)",
     requiredSecrets: [],
+    installCommand: "npm install -g opencode-ai",
   },
 };
 

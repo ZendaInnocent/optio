@@ -15,6 +15,7 @@ export interface WorkspaceMember {
   workspaceId: string;
   userId: string;
   role: WorkspaceRole;
+  canBuild: boolean;
   createdAt: Date;
 }
 

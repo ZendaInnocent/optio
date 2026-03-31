@@ -19,6 +19,7 @@ vi.mock("../db/schema.js", () => ({
     workspaceId: "workspace_members.workspace_id",
     userId: "workspace_members.user_id",
     role: "workspace_members.role",
+    canBuild: "workspace_members.can_build",
     createdAt: "workspace_members.created_at",
   },
   users: {

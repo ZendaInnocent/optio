@@ -55,12 +55,41 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: workspaceRoleEnum("role").notNull().default("member"),
+    canBuild: boolean("can_build").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     unique("workspace_members_workspace_user_key").on(table.workspaceId, table.userId),
     index("workspace_members_user_idx").on(table.userId),
     index("workspace_members_workspace_idx").on(table.workspaceId),
+  ],
+);
+
+// ── Custom Images ───────────────────────────────────────────────────────────
+
+export const customImages = pgTable(
+  "custom_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    repoUrl: text("repo_url"), // nullable: null means workspace-wide image
+    imageTag: text("image_tag").notNull(),
+    agentTypes: jsonb("agent_types").$type<string[]>().notNull().default([]),
+    languagePreset: text("language_preset"),
+    customDockerfile: text("custom_dockerfile"),
+    buildStatus: text("build_status").notNull().default("pending"), // "pending" | "building" | "success" | "failed"
+    buildLogs: text("build_logs"),
+    builtAt: timestamp("built_at", { withTimezone: true }),
+    builtBy: uuid("built_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("custom_images_workspace_repo_key").on(table.workspaceId, table.repoUrl),
+    index("custom_images_workspace_idx").on(table.workspaceId),
+    index("custom_images_repo_url_idx").on(table.repoUrl),
   ],
 );
 
@@ -203,6 +232,7 @@ export const repos = pgTable(
     defaultBranch: text("default_branch").notNull().default("main"),
     isPrivate: boolean("is_private").notNull().default(false),
     imagePreset: text("image_preset").default("base"),
+    agentTypes: jsonb("agent_types").$type<string[]>(),
     extraPackages: text("extra_packages"), // comma-separated
     setupCommands: text("setup_commands"), // shell commands run at pod startup after clone
     customDockerfile: text("custom_dockerfile"), // full Dockerfile override (advanced)
@@ -237,7 +267,7 @@ export const repos = pgTable(
     cpuRequest: text("cpu_request"), // e.g. "500m", "1000m", "2000m" — K8s CPU request
     cpuLimit: text("cpu_limit"), // e.g. "2000m", "4000m" — K8s CPU limit
     memoryRequest: text("memory_request"), // e.g. "512Mi", "1Gi", "2Gi" — K8s memory request
-    memoryLimit: text("memory_limit"), // e.g. "2Gi", "4Gi" — K8s memory limit
+    memoryLimit: text("memory_limit"), // e.g. "2Gi", "4Gi" — K8S memory limit
     dockerInDocker: boolean("docker_in_docker").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -589,6 +619,8 @@ export const optioSettings = pgTable(
         { type: "opencode", enabled: false },
       ]),
     defaultAgent: text("default_agent").notNull().default("claude-code"),
+    defaultAgentType: text("default_agent_type"),
+    defaultLanguagePreset: text("default_language_preset"),
     workspaceId: uuid("workspace_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
