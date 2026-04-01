@@ -133,35 +133,61 @@ You create a task          Optio runs the agent           Optio closes the loop
 - **Docker Desktop** with Kubernetes enabled (Settings → Kubernetes → Enable)
 - **Node.js 22+** and **pnpm 10+**
 - **Helm** (`brew install helm`)
+- **Tilt** — see [Tilt installation docs](https://docs.tilt.dev/install.html)
 
-### Setup
+### Development with Tilt (Recommended)
+
+Tilt provides a Kubernetes-native development experience with live reload, log streaming, and automatic port-forwarding — no need to maintain separate local dev servers.
 
 ```bash
 git clone https://github.com/jonwiggins/optio.git && cd optio
+tilt up
+```
+
+That's it. Tilt builds dev images, deploys the full stack to your local Kubernetes cluster, and opens a dashboard at **http://localhost:10350**.
+
+```
+Tilt Dashboard ... http://localhost:10350
+Web UI ........... http://localhost:30310
+API .............. http://localhost:30400
+```
+
+**How it works:**
+
+- Edit any `.ts`/`.tsx` file → changes sync into pods in ~1-2 seconds
+- API auto-restarts via `tsx watch`, Web auto-refreshes via Next.js HMR
+- All infrastructure (Postgres, Redis) runs in the same cluster
+- Open the Tilt UI for live logs, resource status, and one-click port-forwards
+
+**Tear down:**
+
+```bash
+tilt down
+```
+
+### Production Deployment (Helm)
+
+For production, use the Helm chart with managed services:
+
+```bash
+helm install optio helm/optio \
+  --set encryption.key=$(openssl rand -hex 32) \
+  --set postgresql.enabled=false \
+  --set externalDatabase.url="postgres://..." \
+  --set redis.enabled=false \
+  --set externalRedis.url="redis://..." \
+  --set ingress.enabled=true \
+  --set ingress.hosts[0].host=optio.example.com
+```
+
+See the [Helm chart values](helm/optio/values.yaml) for full configuration options including OAuth providers, resource limits, and agent image settings.
+
+### Legacy: Manual Setup Script
+
+The `./scripts/setup-local.sh` script is still available for full production-like local deployments (no live reload):
+
+```bash
 ./scripts/setup-local.sh
-```
-
-That's it. The setup script installs dependencies, builds all Docker images (API, web, and agent presets), deploys the full stack to your local Kubernetes cluster via Helm, and installs metrics-server.
-
-```
-Web UI ...... http://localhost:30310
-API ......... http://localhost:30400
-```
-
-Open the web UI and the setup wizard will walk you through configuring GitHub access, agent credentials (API key or Max/Pro subscription), and adding your first repository.
-
-### Updating
-
-```bash
-./scripts/update-local.sh
-```
-
-Pulls latest code, rebuilds images, applies Helm changes, and rolling-restarts the deployments.
-
-### Teardown
-
-```bash
-helm uninstall optio -n optio
 ```
 
 ## Project Structure

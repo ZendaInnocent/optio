@@ -11,3 +11,4 @@ apps/api/.env
 /tmp/
 .optio/
 .claude/
+.tilt/

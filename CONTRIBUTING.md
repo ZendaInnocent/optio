@@ -9,30 +9,42 @@ Thanks for your interest in contributing! This guide will help you get started.
 - **Node.js 22+**
 - **pnpm 10+** (`npm install -g pnpm`)
 - **Docker Desktop** with Kubernetes enabled
+- **Helm** - see [Helm installation docs](https://helm.sh/docs/intro/install/)
+- **Tilt** — see [Tilt installation docs](https://docs.tilt.dev/install.html)
 
 ### Quick Start
 
 ```bash
-git clone https://github.com/jonwiggins/optio.git
 cd optio
-pnpm install
-
-# Start Kubernetes infrastructure
-./scripts/setup-local.sh
-
-# Start dev servers (API + Web)
-pnpm dev
+tilt up
 ```
 
-The API runs on http://localhost:4000 and the web UI on http://localhost:3000.
+Tilt builds dev images, deploys everything to your local Kubernetes cluster, and opens a dashboard at http://localhost:10350.
 
-### Building the Agent Image
+```
+Tilt Dashboard ... http://localhost:10350
+Web UI ........... http://localhost:30310
+API .............. http://localhost:30400
+```
+
+**How development works:**
+
+- Edit any `.ts`/`.tsx` file → changes sync into pods in ~1-2 seconds
+- API auto-restarts via `tsx watch`, Web auto-refreshes via Next.js HMR
+- All infrastructure (Postgres, Redis) runs in the same cluster
+- Open the Tilt UI for live logs, resource status, and one-click port-forwards
+
+### Legacy: Manual Dev Mode
+
+If you prefer running dev servers locally (without Tilt):
 
 ```bash
-docker build -t optio-agent:latest -f Dockerfile.agent .
-# Load into K8s containerd (Docker Desktop)
-docker save optio-agent:latest | docker exec -i desktop-control-plane ctr -n k8s.io image import --digests -
+pnpm install
+./scripts/setup-local.sh  # Start K8s infrastructure only
+pnpm dev                  # Start API + Web with hot reload
 ```
+
+The API runs on http://localhost:4000 and the web UI on http://localhost:3100.
 
 ## Project Structure
 
@@ -50,7 +62,8 @@ k8s/          Local dev K8s manifests
 ### Commands
 
 ```bash
-pnpm dev              # Start API + Web with hot reload
+tilt up               # Start full dev environment (recommended)
+pnpm dev              # Start API + Web with hot reload (manual mode)
 pnpm turbo typecheck  # Typecheck all packages
 pnpm turbo test       # Run tests
 pnpm format           # Format with Prettier
