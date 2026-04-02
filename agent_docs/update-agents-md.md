@@ -1,8 +1,4 @@
-# Slash Command: Update AGENTS.md
-
-## Purpose
-
-Refresh `AGENTS.md` and related docs following [humanlayer guide](https://www.humanlayer.dev/blog/writing-a-good-claude-md).
+# Update AGENTS.md
 
 ## When to Use
 
@@ -18,19 +14,14 @@ Refresh `AGENTS.md` and related docs following [humanlayer guide](https://www.hu
 - Count lines in current `AGENTS.md` (target: <60, max <100)
 - Identify code snippets that should be `file:line` refs
 - Identify task-specific info that should be in separate files
+- Identify any instructions that conflict with each other. For each contradiction, ask which version user want to keep.
 
 ### 2. Create Progressive Disclosure Files
 
-Create `agent_docs/` with task-specific docs:
-
-```
-agent_docs/
-├── build-commands.md      # pnpm commands, test runners
-├── code-conventions.md    # naming, imports, errors, testing
-├── database-schema.md     # DB schemas, state machine
-├── service-architecture.md # (optional) for backend work
-├── frontend-components.md # (optional) for frontend work
-```
+- A minimal root AGENTS.md with markdown links to the separate files
+- Each separate file with its relevant instructions
+- Create `agent_docs/` with task-specific docs
+- Organize instructions into logical categories
 
 Each file should use `file:line` references to authoritative code, not copies.
 
@@ -38,21 +29,34 @@ Each file should use `file:line` references to authoritative code, not copies.
 
 Keep only universally applicable content:
 
-- Project overview (WHY/WHAT)
+- Project overview (WHY/WHAT): One-sentence project description
 - Setup-specific config (e.g., context-mode)
 - Progressive disclosure pointers
-- Verification commands
+- Verification commands: Non-standard build/typecheck commands
+- Anything truly relevant to every single task
 
 Target: <60 lines
 
 ### 4. Validate
 
-- Run `pnpm lint` and `pnpm typecheck`
 - Ensure references are valid paths
+- Identify any instructions that are:
+  - Redundant (the agent already knows this)
+  - Too vague to be actionable
+  - Overly obvious (like "write clean code")
 
-## Principles (from Guide)
+## Monorepo
 
-1. **Less is more** — Frontier LLMs follow ~150-200 instructions reliably
+- You can place AGENTS.md files in subdirectories
+
+| Level   | Content                                                                    |
+| ------- | -------------------------------------------------------------------------- |
+| Root    | Monorepo purpose, how to navigate packages, shared tools (pnpm workspaces) |
+| Package | Package purpose, specific tech stack, package-specific conventions         |
+
+## Principles
+
+1. **Less is more**
 2. **Universally applicable** — AGENTS.md goes into every session
 3. **Use references, not copies** — Code snippets rot; `file:line` refs stay valid
 4. **LLM ≠ linter** — Trust Prettier/ESLint, don't teach style to agent
