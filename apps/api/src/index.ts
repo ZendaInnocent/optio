@@ -87,7 +87,6 @@ async function checkMetricsServer() {
 }
 
 async function main() {
-  // Run database migrations before anything else
   const { migrate } = await import("drizzle-orm/postgres-js/migrator");
   const { db } = await import("./db/client.js");
   const { dirname, join } = await import("node:path");
@@ -95,6 +94,18 @@ async function main() {
   const migrationsPath = join(dirname(fileURLToPath(import.meta.url)), "db", "migrations");
   await migrate(db, { migrationsFolder: migrationsPath });
   logger.info("Database migrations applied");
+
+  const { validateSchema, getMissingColumnsMessage } =
+    await import("./services/schema-validator.js");
+  const schemaResult = await validateSchema();
+  if (!schemaResult.valid) {
+    const msg = getMissingColumnsMessage(schemaResult.issues);
+    logger.error({ issues: schemaResult.issues }, `Database schema incomplete: ${msg}`);
+    console.error(`\n❌ Database schema incomplete! Run migrations or add missing columns:`);
+    console.error(`   ${msg}\n`);
+  } else {
+    logger.info("Database schema validated");
+  }
 
   const app = await buildServer();
 

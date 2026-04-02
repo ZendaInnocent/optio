@@ -90,6 +90,7 @@
 - The **Feedback Loop** monitors PRs and CI to decide if a **Task** should be resumed
 - An **Agent Event** belongs to exactly one **Task** and has a timestamp
 - **Secrets** are scoped to either global or a specific **Workspace** or **Repository**
+- **Schema Validation** runs at API startup and fails fast if any **Database Migration** hasn't been applied, preventing cryptic 500 errors
 
 ## Example Dialogue
 
@@ -99,12 +100,26 @@
 > **Domain expert:** "Yes. The adapter also writes `.opencode/opencode.json` if model/temperature were configured. Then the entrypoint runs `opencode run` with the prompt."
 > **Dev:** "How does OpenCode's output get into our logs?"
 > **Domain expert:** "OpenCode streams **Agent Events** as NDJSON lines. The **Task Worker** uses the `parseOpencodeEvent` function to convert each line into structured entries like `text`, `tool_use`, and `thinking`. These are appended to `task_logs`."
-> **Dev:** "What if the CI fails after the PR is opened?"
-> **Domain expert:** "The **Feedback Loop** detects the failing checks and transitions the **Task** to `needs_attention`, then automatically re-queues it. The **Task Worker** resumes using the same **Pod** with `restartFromBranch`, and the agent picks up from the existing worktree."
+> **Dev:** "I just reset the database with `tilt down` and now sessions are failing with 500 errors. What happened?"
+> **Domain expert:** "That's **Schema Drift** — the database was wiped so `interactive_sessions` is missing columns like `agent_type`. Run `pnpm db:migrate` to apply **Database Migrations**, or check `/api/health/schema` for a diagnostic."
+> **Dev:** "Does the health check catch this?"
+> **Domain expert:** "Yes! The **Schema Validation** runs at API startup and checks for core tables. If columns are missing, it logs a clear error listing which tables and columns need to be added."
 > **Dev:** "And how does cost get calculated if OpenCode doesn't emit `total_cost_usd`?"
 > **Domain expert:** "The adapter falls back to a **pricing table** based on the model and token counts. That ensures `costUsd` is always populated for cost tracking."
 > **Dev:** "So the **Agent Type** determines which **Agent Adapter** is used, and each adapter handles its own quirks?"
 > **Domain expert:** "Exactly. Adding a new agent means implementing the **Agent Adapter** interface and registering it. The rest of the system—queuing, pod management, PR watching—works uniformly."
+
+## Database & Infrastructure
+
+| Term                   | Definition                                                                                     | Aliases to avoid          |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ------------------------- |
+| **Database Migration** | The process of applying schema changes (new tables, columns) to the database using Drizzle Kit | Migration, schema update  |
+| **Schema**             | The database structure: tables, columns, indexes, and constraints                              | Database model, structure |
+| **Schema Validation**  | The startup-time check that verifies core tables and required columns exist                    | Schema check, health      |
+| **Schema Drift**       | When the database schema doesn't match the code's expected schema (missing tables or columns)  | Schema mismatch           |
+| **Missing Table**      | A table that should exist in the schema but doesn't (causes query failures)                    | Table not found           |
+| **Missing Column**     | A column that should exist in a table but doesn't (causes insert failures)                     | Column not found          |
+| **Health Check**       | An API endpoint that verifies system readiness (database, container runtime, schema integrity) | Status check, ping        |
 
 ## Flagged Ambiguities
 
@@ -116,3 +131,5 @@
 - **"Task" vs "Job"**: The PRD uses "task" consistently; avoid "job" which might confuse with BullMQ jobs or Kubernetes jobs.
 - **"Provider"**: In OpenCode context, a provider is Anthropic/OpenAI/etc. In Optio context, provider might mean ticket provider (GitHub/Linear). Use "AI provider" vs "ticket provider".
 - **"Setup wizard" vs "setup script"**: The web UI configuration flow is the "setup wizard"; the local dev script is `scripts/setup-local.sh`. Distinguish clearly.
+- **"Migration"**: Could mean database schema migrations or BullMQ job migrations. Use "database migration" or "schema migration" for the former.
+- **"Health" vs "Schema health"**: The `/api/health` endpoint checks basic connectivity; `/api/health/schema` checks table/column integrity. Keep these distinct.
