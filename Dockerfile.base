@@ -9,6 +9,23 @@ RUN corepack enable && corepack prepare pnpm@10 --activate
 # Install tsx globally (cached via npm cache mount)
 RUN --mount=type=cache,id=npm,target=/root/.npm npm install -g tsx
 
+# Install system dependencies (git, curl, sudo, gh CLI)
+RUN apt-get update && apt-get install -y git curl sudo unzip \
+    && GH_VERSION=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep -o '"tag_name": "[^"]*' | sed 's/"tag_name": "//') \
+    && curl -LO "https://github.com/cli/cli/releases/download/${GH_VERSION}/gh_${GH_VERSION#v}_linux_amd64.deb" \
+    && dpkg -i gh_*.deb \
+    && rm gh_*.deb \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && chmod +x kubectl \
+    && mv kubectl /usr/local/bin/
+
+# Copy repo-init script
+COPY scripts/repo-init.sh /opt/optio/repo-init.sh
+RUN chmod +x /opt/optio/repo-init.sh
+
 WORKDIR /app
 
 # Copy workspace config

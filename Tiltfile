@@ -31,28 +31,6 @@ docker_build(
     "optio-base",
     ".",
     dockerfile="Dockerfile.base",
-    # Only watch files that affect dependency install
-    only=[
-        "package.json",
-        "pnpm-lock.yaml",
-        "pnpm-workspace.yaml",
-        "turbo.json",
-        "tsconfig.base.json",
-        "apps/api/package.json",
-        "apps/api/tsconfig.json",
-        "apps/web/package.json",
-        "apps/web/tsconfig.json",
-        "packages/shared/package.json",
-        "packages/shared/tsconfig.json",
-        "packages/container-runtime/package.json",
-        "packages/container-runtime/tsconfig.json",
-        "packages/agent-adapters/package.json",
-        "packages/agent-adapters/tsconfig.json",
-        "packages/ticket-providers/package.json",
-        "packages/ticket-providers/tsconfig.json",
-        "packages/image-builder/package.json",
-        "packages/image-builder/tsconfig.json",
-    ],
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -63,19 +41,6 @@ docker_build(
     "optio-api",
     ".",
     dockerfile="Dockerfile.api.dev",
-    only=[
-        "package.json",
-        "pnpm-lock.yaml",
-        "pnpm-workspace.yaml",
-        "turbo.json",
-        "tsconfig.base.json",
-        "apps/api/",
-        "packages/shared/",
-        "packages/container-runtime/",
-        "packages/agent-adapters/",
-        "packages/ticket-providers/",
-        "packages/image-builder/",
-    ],
     live_update=[
         sync("./apps/api/", "/app/apps/api/"),
         sync("./packages/", "/app/packages/"),
@@ -90,15 +55,6 @@ docker_build(
     "optio-web",
     ".",
     dockerfile="Dockerfile.web.dev",
-    only=[
-        "package.json",
-        "pnpm-lock.yaml",
-        "pnpm-workspace.yaml",
-        "turbo.json",
-        "tsconfig.base.json",
-        "apps/web/",
-        "packages/shared/",
-    ],
     live_update=[
         sync("./apps/web/", "/app/apps/web/"),
         sync("./packages/shared/", "/app/packages/shared/"),
@@ -123,6 +79,8 @@ helm_values = [
     "--set", "auth.disabled=true",
     "--set", "encryption.key=" + dev_encryption_key,
     "--set", "postgresql.auth.password=optio_dev",
+    # Override WS URL for local browser access via NodePort
+    "--set", "web.env.wsUrl=ws://localhost:" + str(api_node_port),
     # Dev resource overrides — Next.js dev compilation needs more CPU
     "--set", "api.resources.requests.cpu=250m",
     "--set", "api.resources.requests.memory=512Mi",
@@ -132,7 +90,7 @@ helm_values = [
     "--set", "web.resources.requests.memory=1Gi",
     "--set", "web.resources.limits.cpu=2",
     "--set", "web.resources.limits.memory=2Gi",
-]
+  ]
 
 helm_output = local(
     "helm template " + release_name + " helm/optio --namespace " + namespace + " --skip-tests " +
@@ -154,5 +112,4 @@ k8s_resource(
 k8s_resource(
     release_name + "-web",
     port_forwards=[str(web_node_port) + ":3000"],
-    resource_deps=[release_name + "-api"],
 )

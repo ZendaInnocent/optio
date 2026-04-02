@@ -56,15 +56,15 @@ spec:
                 - ALL
           ports:
             - containerPort: {{ .Values.web.port }}
-          env:
-            - name: NEXT_PUBLIC_API_URL
-              value: "http://{{ .Release.Name }}-api:{{ .Values.api.port }}"
-            - name: INTERNAL_API_URL
-              value: "http://{{ .Release.Name }}-api:{{ .Values.api.port }}"
-            - name: NEXT_PUBLIC_WS_URL
-              value: "ws://{{ .Release.Name }}-api:{{ .Values.api.port }}"
-            - name: NEXT_PUBLIC_AUTH_DISABLED
-              value: {{ .Values.auth.disabled | quote }}
+           env:
+             - name: NEXT_PUBLIC_API_URL
+               value: {{ .Values.web.env.apiUrl | default (printf "http://%s-api:%d" .Release.Name .Values.api.port) | quote }}
+             - name: INTERNAL_API_URL
+               value: {{ .Values.web.env.internalApiUrl | default (printf "http://%s-api:%d" .Release.Name .Values.api.port) | quote }}
+             - name: NEXT_PUBLIC_WS_URL
+               value: {{ .Values.web.env.wsUrl | default (printf "ws://%s-api:%d" .Release.Name .Values.api.port) | quote }}
+             - name: NEXT_PUBLIC_AUTH_DISABLED
+               value: {{ .Values.auth.disabled | quote }}
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
 ---

@@ -5,8 +5,8 @@ echo "[optio] Initializing repo pod"
 echo "[optio] Repo: ${OPTIO_REPO_URL} (branch: ${OPTIO_REPO_BRANCH})"
 
 # Configure git
-git config --global user.name "Optio Agent"
-git config --global user.email "optio-agent@noreply.github.com"
+git config --global user.name "Innocent Zenda"
+git config --global user.email "zendainnocent@gmail.com"
 
 # When secret proxy is enabled, trust the Envoy-generated CA certificate
 # and configure git/gh to use the proxy instead of raw credentials.
