@@ -23,14 +23,13 @@ api_node_port = 30400
 web_node_port = 30310
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Base Image — all workspace dependencies
-# Only rebuilds when package.json or pnpm-lock.yaml changes.
-# Both api and web dev images FROM this.
+# Multi-stage dev images — single Dockerfile with persistent caches
 # ──────────────────────────────────────────────────────────────────────────────
 docker_build(
     "optio-base",
     ".",
-    dockerfile="Dockerfile.base",
+    dockerfile="Dockerfile.dev",
+    target="optio-base",
     # Only watch files that affect dependency install
     only=[
         "package.json",
@@ -62,7 +61,21 @@ docker_build(
 docker_build(
     "optio-api",
     ".",
-    dockerfile="Dockerfile.api.dev",
+    dockerfile="Dockerfile.dev",
+    target="optio-api",
+    only=[
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        "tsconfig.base.json",
+        "apps/api/",
+        "packages/shared/",
+        "packages/container-runtime/",
+        "packages/agent-adapters/",
+        "packages/ticket-providers/",
+        "packages/image-builder/",
+    ],
     live_update=[
         sync("./apps/api/", "/app/apps/api/"),
         sync("./packages/", "/app/packages/"),
@@ -76,7 +89,17 @@ docker_build(
 docker_build(
     "optio-web",
     ".",
-    dockerfile="Dockerfile.web.dev",
+    dockerfile="Dockerfile.dev",
+    target="optio-web",
+    only=[
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        "tsconfig.base.json",
+        "apps/web/",
+        "packages/shared/",
+    ],
     live_update=[
         sync("./apps/web/", "/app/apps/web/"),
         sync("./packages/shared/", "/app/packages/shared/"),

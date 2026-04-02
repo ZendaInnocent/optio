@@ -1,0 +1,57 @@
+# Multi-stage dev Dockerfile — both API and Web share a base layer.
+# Build with: docker build --target <stage> -f Dockerfile.dev .
+#   --target optio-base   # dependencies only
+#   --target optio-api    # API dev server (tsx watch)
+#   --target optio-web    # Web dev server (Next.js HMR)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage 1: Base — all workspace dependencies
+# ──────────────────────────────────────────────────────────────────────────────
+FROM node:22-slim AS optio-base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+# Install tsx globally (cached)
+RUN --mount=type=cache,id=npm,target=/root/.npm npm install -g tsx
+
+WORKDIR /app
+
+# Copy workspace config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+
+# Copy package.json + tsconfig for every workspace package
+COPY apps/api/package.json apps/api/tsconfig.json apps/api/
+COPY apps/web/package.json apps/web/tsconfig.json apps/web/
+COPY packages/shared/package.json packages/shared/tsconfig.json packages/shared/
+COPY packages/container-runtime/package.json packages/container-runtime/tsconfig.json packages/container-runtime/
+COPY packages/agent-adapters/package.json packages/agent-adapters/tsconfig.json packages/agent-adapters/
+COPY packages/ticket-providers/package.json packages/ticket-providers/tsconfig.json packages/ticket-providers/
+COPY packages/image-builder/package.json packages/image-builder/tsconfig.json packages/image-builder/
+
+# Install all dependencies with persistent pnpm cache
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --no-frozen-lockfile --ignore-scripts
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage 2: API dev — runs tsx watch
+# ──────────────────────────────────────────────────────────────────────────────
+FROM optio-base AS optio-api
+
+WORKDIR /app/apps/api
+EXPOSE 4000
+CMD ["tsx", "watch", "src/index.ts"]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage 3: Web dev — runs Next.js dev server
+# ──────────────────────────────────────────────────────────────────────────────
+FROM optio-base AS optio-web
+
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN mkdir -p /app/apps/web/.next && chmod -R 777 /app/apps/web/.next
+
+WORKDIR /app/apps/web
+EXPOSE 3000
+CMD ["npx", "next", "dev", "--port", "3000", "--hostname", "0.0.0.0"]
