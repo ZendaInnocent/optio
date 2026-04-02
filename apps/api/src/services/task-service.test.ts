@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TaskState } from "@optio/shared";
+import { getSettings } from "./optio-settings-service.js";
 
 vi.mock("../db/client.js", () => ({
   db: {
@@ -29,6 +30,9 @@ vi.mock("../db/schema.js", () => ({
 vi.mock("./event-bus.js", () => ({ publishEvent: vi.fn() }));
 vi.mock("../logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+vi.mock("./optio-settings-service.js", () => ({
+  getSettings: vi.fn(),
 }));
 
 import { db } from "../db/client.js";
@@ -87,6 +91,59 @@ describe("createTask", () => {
     expect(publishEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "task:created", taskId: "task-1" }),
     );
+  });
+
+  it("uses workspace default agent when agentType not provided", async () => {
+    // Mock getSettings to return a default agent
+    const mockSettings = {
+      id: "settings-1",
+      model: "sonnet",
+      systemPrompt: "",
+      enabledTools: [],
+      confirmWrites: true,
+      maxTurns: 20,
+      agents: [],
+      defaultAgent: "codex",
+      workspaceId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    (getSettings as any).mockResolvedValue(mockSettings);
+
+    const mockTask = { id: "task-2", title: "Test2", state: "pending", agentType: "codex" };
+    vi.mocked(db.insert(undefined as any).values(undefined as any).returning).mockResolvedValueOnce(
+      [mockTask] as any,
+    );
+
+    const result = await createTask({
+      title: "Test2",
+      prompt: "Do something",
+      repoUrl: "https://github.com/o/r",
+      // no agentType
+    });
+
+    expect(result.id).toBe("task-2");
+    // Verify that getSettings was called with null workspaceId (since no workspaceId provided)
+    expect(getSettings).toHaveBeenCalledWith(null);
+    // The inserted agentType should be the default from settings
+    // The returned task's agentType should also reflect that (since we set mockTask accordingly)
+    expect(result.agentType).toBe("codex");
+  });
+
+  it("does not call getSettings when agentType is provided", async () => {
+    const mockTask = { id: "task-3", title: "Test3", state: "pending" };
+    vi.mocked(db.insert(undefined as any).values(undefined as any).returning).mockResolvedValueOnce(
+      [mockTask] as any,
+    );
+
+    await createTask({
+      title: "Test3",
+      prompt: "Do",
+      repoUrl: "https://github.com/o/r",
+      agentType: "claude-code",
+    });
+
+    expect(getSettings).not.toHaveBeenCalled();
   });
 });
 

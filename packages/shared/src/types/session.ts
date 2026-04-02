@@ -11,6 +11,7 @@ export interface InteractiveSession {
   branch: string;
   state: InteractiveSessionState;
   podId: string | null;
+  agentType?: string | null;
   costUsd: string | null;
   createdAt: string;
   endedAt: string | null;

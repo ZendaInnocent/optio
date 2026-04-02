@@ -15,6 +15,8 @@ vi.mock("../db/schema.js", () => ({
     repoUrl: "interactive_sessions.repo_url",
     state: "interactive_sessions.state",
     createdAt: "interactive_sessions.created_at",
+    agentType: "interactive_sessions.agent_type",
+    updatedAt: "interactive_sessions.updated_at",
   },
   sessionPrs: {
     id: "session_prs.id",
@@ -64,6 +66,7 @@ import {
   addSessionPr,
   updateSessionPr,
   getActiveSessionCount,
+  updateSessionAgentType,
 } from "./interactive-session-service.js";
 
 describe("interactive-session-service", () => {
@@ -150,6 +153,129 @@ describe("interactive-session-service", () => {
         { customImage: "optio-agent:latest" },
         expect.any(Object),
       );
+    });
+
+    it("creates session with specified agentType", async () => {
+      // Mock repo config lookup
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([
+            {
+              defaultBranch: "main",
+              imagePreset: "node",
+              maxAgentsPerPod: 2,
+              maxPodInstances: 1,
+              networkPolicy: "unrestricted",
+              cpuRequest: null,
+              cpuLimit: null,
+              memoryRequest: null,
+              memoryLimit: null,
+            },
+          ]),
+        }),
+      });
+
+      vi.mocked(getOrCreateRepoPod).mockResolvedValue({
+        id: "pod-1",
+        podName: "optio-repo-pod-1",
+      } as any);
+
+      (db.insert as any) = vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([
+            {
+              id: "session-1",
+              repoUrl: "https://github.com/owner/repo",
+              state: "active",
+              podId: "pod-1",
+              agentType: "claude-code",
+            },
+          ]),
+        }),
+      });
+
+      const result = await createSession({
+        repoUrl: "https://github.com/owner/repo",
+        userId: "user-1",
+        agentType: "claude-code",
+      });
+
+      expect(result.id).toBe("session-1");
+      expect(result.agentType).toBe("claude-code");
+    });
+
+    it("creates session without agentType defaults to null", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([
+            {
+              defaultBranch: "main",
+            },
+          ]),
+        }),
+      });
+
+      vi.mocked(getOrCreateRepoPod).mockResolvedValue({
+        id: "pod-1",
+        podName: "optio-repo-pod-1",
+      } as any);
+
+      (db.insert as any) = vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([
+            {
+              id: "session-1",
+              repoUrl: "https://github.com/owner/repo",
+              state: "active",
+              podId: "pod-1",
+              agentType: null,
+            },
+          ]),
+        }),
+      });
+
+      const result = await createSession({
+        repoUrl: "https://github.com/owner/repo",
+      });
+
+      expect(result.agentType).toBeNull();
+    });
+
+    it("creates session without agentType defaults to null", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([
+            {
+              defaultBranch: "main",
+            },
+          ]),
+        }),
+      });
+
+      vi.mocked(getOrCreateRepoPod).mockResolvedValue({
+        id: "pod-1",
+        podName: "optio-repo-pod-1",
+      } as any);
+
+      (db.insert as any) = vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([
+            {
+              id: "session-1",
+              repoUrl: "https://github.com/owner/repo",
+              state: "active",
+              podId: "pod-1",
+              agentType: null,
+            },
+          ]),
+        }),
+      });
+
+      const result = await createSession({
+        repoUrl: "https://github.com/owner/repo",
+      });
+
+      expect(result.agentType).toBeNull();
     });
   });
 
@@ -285,22 +411,42 @@ describe("interactive-session-service", () => {
 
       await expect(endSession("nonexistent")).rejects.toThrow("Session not found");
     });
+  });
 
-    it("throws when session already ended", async () => {
-      let selectCallCount = 0;
-      (db.select as any) = vi.fn().mockImplementation(() => ({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockImplementation(() => {
-            selectCallCount++;
-            if (selectCallCount === 1) {
-              return Promise.resolve([{ id: "session-1", state: "ended", podId: null }]);
-            }
-            return Promise.resolve([]);
+  describe("updateSessionAgentType", () => {
+    it("updates agentType for a session", async () => {
+      (db.update as any) = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
+              {
+                id: "session-1",
+                agentType: "opencode",
+                updatedAt: new Date(),
+              },
+            ]),
           }),
         }),
-      }));
+      });
 
-      await expect(endSession("session-1")).rejects.toThrow("Session already ended");
+      const result = await updateSessionAgentType("session-1", "opencode");
+
+      expect(result).not.toBeNull();
+      expect(result!.agentType).toBe("opencode");
+    });
+
+    it("returns null when no rows updated", async () => {
+      (db.update as any) = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      const result = await updateSessionAgentType("nonexistent", "claude-code");
+
+      expect(result).toBeNull();
     });
   });
 

@@ -51,6 +51,9 @@ describe("sessionChatWs", () => {
     });
     sessionChatWs(mockApp);
 
+    // Simulate authenticated user attached to request by middleware
+    mockReq.user = { id: "user-1", workspaceId: null };
+
     try {
       await handler(mockSocket, mockReq);
     } catch (e) {
@@ -88,6 +91,8 @@ describe("sessionChatWs", () => {
       handler = cb;
     });
     sessionChatWs(mockApp);
+    // Simulate authenticated user attached to request
+    mockReq.user = { id: "user-1", workspaceId: null };
     await handler(mockSocket, mockReq);
 
     expect(mockSocket.send).toHaveBeenCalledWith(

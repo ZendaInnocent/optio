@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { getRuntime } from "../services/container-service.js";
-import { getSession } from "../services/interactive-session-service.js";
+import { getSession, updateSessionAgentType } from "../services/interactive-session-service.js";
 import { getSettings } from "../services/optio-settings-service.js";
 import { db } from "../db/client.js";
 import { repoPods, repos, interactiveSessions } from "../db/schema.js";
@@ -9,7 +9,7 @@ import { logger } from "../logger.js";
 import { parseClaudeEvent } from "../services/agent-event-parser.js";
 import { publishSessionEvent } from "../services/event-bus.js";
 import type { ExecSession, OptioSettings, AgentType } from "@optio/shared";
-import { extractSessionToken } from "./ws-auth.js";
+import { authenticateWs, extractSessionToken } from "./ws-auth.js";
 import { getAdapter } from "@optio/agent-adapters";
 
 /**
@@ -39,6 +39,14 @@ export async function sessionChatWs(app: FastifyInstance) {
     // made by the agent carry the user's identity.
     const userSessionToken = extractSessionToken(req);
 
+    // Authenticate the WebSocket connection
+    const authUser = await authenticateWs(socket, req);
+    if (!authUser) {
+      return; // authenticateWs already closed the socket
+    }
+    // Attach user to request for downstream use
+    (req as any).user = authUser;
+
     const session = await getSession(sessionId);
     if (!session) {
       socket.send(JSON.stringify({ type: "error", message: "Session not found" }));
@@ -48,6 +56,15 @@ export async function sessionChatWs(app: FastifyInstance) {
 
     if (session.state !== "active") {
       socket.send(JSON.stringify({ type: "error", message: "Session is not active" }));
+      socket.close();
+      return;
+    }
+
+    // Authorization: ensure the user owns this session
+    if (session.userId && req.user?.id !== session.userId) {
+      socket.send(
+        JSON.stringify({ type: "error", message: "Unauthorized: you do not own this session" }),
+      );
       socket.close();
       return;
     }
@@ -73,8 +90,10 @@ export async function sessionChatWs(app: FastifyInstance) {
     const workspaceId = req.user?.workspaceId ?? null;
     const optioSettings = await getSettings(workspaceId);
 
-    // Get the agent adapter based on settings
-    let currentAgentType = optioSettings.defaultAgent || "opencode";
+    // Get the agent adapter based on settings, with session override
+    const sessionAgentType = session.agentType ?? null;
+    const effectiveAgentType = sessionAgentType || optioSettings.defaultAgent || "opencode";
+    let currentAgentType = effectiveAgentType;
     let adapter = getAdapter(currentAgentType);
     if (!adapter) {
       socket.send(
@@ -300,6 +319,10 @@ export async function sessionChatWs(app: FastifyInstance) {
               currentAgentType = msg.agentType as AgentType;
               adapter = newAdapter;
               log.info({ agentType: currentAgentType }, "Agent changed");
+              // Persist the agent override for this session (fire-and-forget)
+              updateSessionAgentType(sessionId, currentAgentType).catch((err) =>
+                log.warn({ err }, "Failed to persist agent type override"),
+              );
               send({
                 type: "status",
                 status: isProcessing ? "thinking" : "idle",

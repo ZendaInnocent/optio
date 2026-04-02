@@ -7,7 +7,11 @@ import { InteractiveSessionState, normalizeRepoUrl } from "@optio/shared";
 import { getOrCreateRepoPod, resolveAgentImage } from "./repo-pool-service.js";
 import { logger } from "../logger.js";
 
-export async function createSession(input: { repoUrl: string; userId?: string }) {
+export async function createSession(input: {
+  repoUrl: string;
+  userId?: string;
+  agentType?: string;
+}) {
   const repoUrl = normalizeRepoUrl(input.repoUrl);
 
   // Look up repo config for branch and image settings
@@ -61,6 +65,7 @@ export async function createSession(input: { repoUrl: string; userId?: string })
       branch,
       state: "active",
       podId: pod.id,
+      agentType: input.agentType ?? null,
     })
     .returning();
 
@@ -81,6 +86,16 @@ export async function createSession(input: { repoUrl: string; userId?: string })
   });
 
   return { ...session, podName: pod.podName };
+}
+
+export async function updateSessionAgentType(sessionId: string, agentType: string) {
+  const [updated] = await db
+    .update(interactiveSessions)
+    .set({ agentType, updatedAt: new Date() })
+    .where(eq(interactiveSessions.id, sessionId))
+    .returning();
+
+  return updated ?? null;
 }
 
 export async function getSession(id: string) {

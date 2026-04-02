@@ -1,5 +1,5 @@
 # Format all staged files
 npx lint-staged
 
-# Run typecheck to catch issues before push
-pnpm turbo typecheck
+# Run typecheck only on affected packages
+pnpm turbo typecheck --parallel

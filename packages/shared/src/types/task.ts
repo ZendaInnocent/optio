@@ -64,7 +64,7 @@ export interface CreateTaskInput {
   prompt: string;
   repoUrl: string;
   repoBranch?: string;
-  agentType: string;
+  agentType?: string;
   ticketSource?: string;
   ticketExternalId?: string;
   metadata?: Record<string, unknown>;
