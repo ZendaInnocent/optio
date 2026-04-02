@@ -5,6 +5,11 @@ FROM optio-base
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Copy source so the image works on first build
+# (live_update overrides these during development)
+COPY apps/web/ apps/web/
+COPY packages/shared/ packages/shared/
+
 RUN mkdir -p /app/apps/web/.next && chmod -R 777 /app/apps/web/.next
 
 WORKDIR /app/apps/web

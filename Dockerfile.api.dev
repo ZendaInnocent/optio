@@ -2,6 +2,11 @@
 # Dependencies come from optio-base (see Tiltfile dependent_images).
 FROM optio-base
 
+# Copy source so the image works on first build
+# (live_update overrides these during development)
+COPY apps/api/ apps/api/
+COPY packages/ packages/
+
 WORKDIR /app/apps/api
 EXPOSE 4000
 CMD ["tsx", "watch", "src/index.ts"]

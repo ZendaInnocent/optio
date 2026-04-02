@@ -23,13 +23,14 @@ api_node_port = 30400
 web_node_port = 30310
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Multi-stage dev images — single Dockerfile with persistent caches
+# Base Image — all workspace dependencies
+# Only rebuilds when package.json or pnpm-lock.yaml changes.
+# Both api and web dev images FROM this.
 # ──────────────────────────────────────────────────────────────────────────────
 docker_build(
     "optio-base",
     ".",
-    dockerfile="Dockerfile.dev",
-    target="optio-base",
+    dockerfile="Dockerfile.base",
     # Only watch files that affect dependency install
     only=[
         "package.json",
@@ -61,8 +62,7 @@ docker_build(
 docker_build(
     "optio-api",
     ".",
-    dockerfile="Dockerfile.dev",
-    target="optio-api",
+    dockerfile="Dockerfile.api.dev",
     only=[
         "package.json",
         "pnpm-lock.yaml",
@@ -89,8 +89,7 @@ docker_build(
 docker_build(
     "optio-web",
     ".",
-    dockerfile="Dockerfile.dev",
-    target="optio-web",
+    dockerfile="Dockerfile.web.dev",
     only=[
         "package.json",
         "pnpm-lock.yaml",
@@ -124,6 +123,15 @@ helm_values = [
     "--set", "auth.disabled=true",
     "--set", "encryption.key=" + dev_encryption_key,
     "--set", "postgresql.auth.password=optio_dev",
+    # Dev resource overrides — Next.js dev compilation needs more CPU
+    "--set", "api.resources.requests.cpu=250m",
+    "--set", "api.resources.requests.memory=512Mi",
+    "--set", "api.resources.limits.cpu=1",
+    "--set", "api.resources.limits.memory=1Gi",
+    "--set", "web.resources.requests.cpu=500m",
+    "--set", "web.resources.requests.memory=1Gi",
+    "--set", "web.resources.limits.cpu=2",
+    "--set", "web.resources.limits.memory=2Gi",
 ]
 
 helm_output = local(
