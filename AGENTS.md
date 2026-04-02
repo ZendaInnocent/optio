@@ -41,64 +41,46 @@ Read these before working on related tasks:
 - `agent_docs/build-commands.md` — All build/test/lint commands
 - `agent_docs/code-conventions.md` — Naming, imports, errors, testing patterns
 - `agent_docs/database-schema.md` — DB schemas, state machine, query patterns
+- `agent_docs/agent-system-running.md` — Running agent commands and evaluations
+- `agent_docs/agent-system-api.md` — Agent API endpoints
+- `agent_docs/agent-system-architecture.md` — System architecture
+- `agent_docs/agent-system-prompts.md` — Prompt system details
 
-## Agent System
+## Context-Efficient Execution (MANDATORY)
 
-### Running Agents
+Use `scripts/run-silent.js` to run commands. This reduces context waste by:
+
+- Success: Shows only `✓ description` (1 line)
+- Failure: Shows full output (helps agent debug)
+
+**Usage:**
 
 ```bash
-# List available prompts
-pnpm agent:list
-
-# View a prompt
-pnpm agent:prompt do-work
-pnpm agent:prompt do-work implement
-pnpm agent:prompt plan analyze
-pnpm agent:prompt review code-quality
-
-# Run evals
-pnpm eval:prompts              # All prompts (do-work + plan + review + context)
-pnpm eval:prompts do-work      # Do-work only
-pnpm eval:prompts plan         # Plan only
-pnpm eval:prompts review       # Review only
-pnpm eval:prompts context      # Context only
+node scripts/run-silent.js "description" "command"
 ```
 
-### API Endpoints
+**Examples:**
 
-| Method | Endpoint                    | Description                    |
-| ------ | --------------------------- | ------------------------------ |
-| POST   | `/agents/run`               | Start a new agent run          |
-| GET    | `/agents`                   | List all agent threads         |
-| GET    | `/agents/:threadId`         | Get thread status              |
-| GET    | `/agents/:threadId/history` | Get full event history         |
-| POST   | `/agents/:threadId/pause`   | Pause a running thread         |
-| POST   | `/agents/:threadId/resume`  | Resume a paused thread         |
-| POST   | `/agents/:threadId/fork`    | Fork a thread at current state |
-| POST   | `/agents/:threadId/context` | Build context for a thread     |
+```bash
+# Run lint with quiet output
+node scripts/run-silent.js "lint" "pnpm lint"
 
-### Architecture
+# Run tests with vitest count
+node scripts/run-silent.js "API tests" "pnpm --filter @optio/api test"
 
-- **Prompts**: `.agents/prompts/` — Modular prompt files (do-work, plan, review)
-- **Events**: `.agents/events/schema.json` — 18 event types for state machine
-- **Handlers**: `apps/api/src/lib/agent/handlers/` — Event handlers (TypeScript)
-- **Context**: `apps/api/src/lib/agent/context/` — Context management with safety filtering
-- **Repository**: `apps/api/src/lib/agent/repository.ts` — DB operations for threads/events
-- **Runner**: `apps/api/src/lib/agent/runner.ts` — Event loop executor
+# Debug: see full output
+VERBOSE=1 node scripts/run-silent.js "lint" "pnpm lint"
+```
 
-### Prompt System
-
-All prompts are modular and testable:
-
-| Prompt  | Files                                          | Tests         |
-| ------- | ---------------------------------------------- | ------------- |
-| do-work | `config.md`, `phases/*.md`, `anti-patterns.md` | 13 eval tests |
-| plan    | `analyze.md`, `decompose.md`                   | 9 eval tests  |
-| review  | `code-quality.md`                              | 8 eval tests  |
-| context | `config.md`                                    | 8 eval tests  |
-
-**Total: 38 eval tests, all passing.**
+**Framework auto-detection**: vitest, pytest, jest, go test
 
 ## Verification
 
 Run `pnpm lint` and `pnpm typecheck` before committing. Don't manually fix lint/format issues — trust the tools.
+
+## Tilt Usage
+
+- **NEVER run `tilt down`** — it deletes the PostgreSQL PVC and wipes all data (repos, sessions, etc.)
+- Use `tilt up` to start or rebuild; Tilt live-updates in place
+- To trigger a rebuild, use `tilt trigger <resource>` or edit the watched files
+- To rebuild Docker images, use `docker build` directly — Tilt picks up the new image
