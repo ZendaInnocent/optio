@@ -1,5 +1,9 @@
 # Format all staged files
 npx lint-staged
 
-# Run typecheck only on affected packages
-pnpm turbo typecheck --parallel
+# Run root lint (with cache)
+node scripts/run-silent.js "root lint" "pnpm lint"
+
+# Run lint & typecheck on affected packages via turbo
+node scripts/run-silent.js "lint --affected" "pnpm turbo lint --affected"
+node scripts/run-silent.js "typecheck --affected" "pnpm turbo typecheck --affected"

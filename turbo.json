@@ -9,8 +9,13 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {},
-    "typecheck": {},
+    "lint": {
+      "inputs": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/.eslintrc*", "eslint.config.*"],
+      "outputs": [".eslintcache", ".turbo/**"]
+    },
+    "typecheck": {
+      "inputs": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "tsconfig.json"]
+    },
     "test": {
       "dependsOn": ["^build"]
     },
