@@ -5,13 +5,16 @@ import {
   threadEvents,
   threadSnapshots,
   eventCorrections,
-  type AgentThread,
-  type ThreadEvent,
-  type ThreadSnapshot,
+  type AgentThread as AgentThreadType,
+  type ThreadEvent as ThreadEventType,
+  type ThreadSnapshot as ThreadSnapshotType,
 } from "../../db/schema.js";
 
 export type ThreadStatus = "pending" | "running" | "paused" | "completed" | "failed" | "forked";
 export type ThreadPhase = string;
+export type AgentThread = AgentThreadType;
+export type ThreadEvent = ThreadEventType;
+export type ThreadSnapshot = ThreadSnapshotType;
 
 export interface ThreadState {
   phase: ThreadPhase | null;

@@ -417,6 +417,117 @@ function printResults(results, label) {
   return { passed, total: results.length, score: parseFloat(score) };
 }
 
+// Context specific tests
+const CONTEXT_TESTS = {
+  "C-001": {
+    name: "Has Context Config",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const exists = fs.existsSync(configPath);
+      return {
+        passed: exists,
+        details: exists ? "Context config present" : "Missing config.md",
+      };
+    },
+  },
+  "C-002": {
+    name: "Has Context Manager Module",
+    check: () => {
+      const managerPath = path.join(
+        AGENTS_DIR,
+        "..",
+        "apps",
+        "api",
+        "src",
+        "lib",
+        "agent",
+        "context",
+        "index.ts",
+      );
+      const exists = fs.existsSync(managerPath);
+      return {
+        passed: exists,
+        details: exists ? "Context manager present" : "Missing context module",
+      };
+    },
+  },
+  "C-003": {
+    name: "Config Has Safety Filter",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const content = fs.readFileSync(configPath, "utf-8");
+      const hasSafety = content.toLowerCase().includes("safety");
+      return {
+        passed: hasSafety,
+        details: hasSafety ? "Safety filter configured" : "Missing safety config",
+      };
+    },
+  },
+  "C-004": {
+    name: "Config Has Token Budget",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const content = fs.readFileSync(configPath, "utf-8");
+      const hasBudget = content.toLowerCase().includes("tokenbudget");
+      return {
+        passed: hasBudget,
+        details: hasBudget ? "Token budget configured" : "Missing token budget",
+      };
+    },
+  },
+  "C-005": {
+    name: "Config Has Error Handling",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const content = fs.readFileSync(configPath, "utf-8");
+      const hasErrorHandling = content.toLowerCase().includes("error");
+      return {
+        passed: hasErrorHandling,
+        details: hasErrorHandling ? "Error handling configured" : "Missing error config",
+      };
+    },
+  },
+  "C-006": {
+    name: "Config Has Format Options",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const content = fs.readFileSync(configPath, "utf-8");
+      const hasFormat =
+        content.includes("json") && content.includes("markdown") && content.includes("hybrid");
+      return {
+        passed: hasFormat,
+        details: hasFormat ? "Format options configured" : "Missing format options",
+      };
+    },
+  },
+  "C-007": {
+    name: "Config Has Information Density",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const content = fs.readFileSync(configPath, "utf-8");
+      const hasDensity =
+        content.toLowerCase().includes("density") || content.toLowerCase().includes("compress");
+      return {
+        passed: hasDensity,
+        details: hasDensity ? "Information density configured" : "Missing density config",
+      };
+    },
+  },
+  "C-008": {
+    name: "Config Has Token Efficiency",
+    check: () => {
+      const configPath = path.join(AGENTS_DIR, "context", "config.md");
+      const content = fs.readFileSync(configPath, "utf-8");
+      const hasEfficiency =
+        content.toLowerCase().includes("token") && content.toLowerCase().includes("efficiency");
+      return {
+        passed: hasEfficiency,
+        details: hasEfficiency ? "Token efficiency configured" : "Missing efficiency config",
+      };
+    },
+  },
+};
+
 function main() {
   const args = process.argv.slice(2);
   const promptType = args[0] ?? "all";
@@ -426,6 +537,7 @@ function main() {
       ...runTests(DO_WORK_TESTS, "Do-Work Prompt Tests"),
       ...runTests(PLAN_TESTS, "Plan Prompt Tests"),
       ...runTests(REVIEW_TESTS, "Review Prompt Tests"),
+      ...runTests(CONTEXT_TESTS, "Context Management Tests"),
     ];
     printResults(allResults, "All Prompt Tests");
   } else if (promptType === "do-work") {
@@ -434,9 +546,11 @@ function main() {
     printResults(runTests(PLAN_TESTS, "Plan Prompt Tests"), "Plan Prompt Tests");
   } else if (promptType === "review") {
     printResults(runTests(REVIEW_TESTS, "Review Prompt Tests"), "Review Prompt Tests");
+  } else if (promptType === "context") {
+    printResults(runTests(CONTEXT_TESTS, "Context Management Tests"), "Context Management Tests");
   } else {
     console.error(`Unknown prompt type: ${promptType}`);
-    console.log("Available: all, do-work, plan, review");
+    console.log("Available: all, do-work, plan, review, context");
     process.exit(1);
   }
 }
