@@ -6,6 +6,7 @@ import { repoPods } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 import type { ContainerHandle, ExecSession } from "@optio/shared";
+import { authenticateWs } from "./ws-auth.js";
 
 const PR_URL_REGEX = /https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/g;
 
@@ -14,9 +15,20 @@ export async function sessionTerminalWs(app: FastifyInstance) {
     const { sessionId } = req.params as { sessionId: string };
     const log = logger.child({ sessionId });
 
+    // Authenticate the WebSocket connection
+    const user = await authenticateWs(socket, req);
+    if (!user) return;
+
     const session = await getSession(sessionId);
     if (!session) {
       socket.send(JSON.stringify({ error: "Session not found" }));
+      socket.close();
+      return;
+    }
+
+    // Ownership check: if session has a userId, it must match the authenticated user
+    if (session.userId && session.userId !== user.id) {
+      socket.send(JSON.stringify({ error: "Unauthorized: you do not own this session" }));
       socket.close();
       return;
     }
@@ -43,6 +55,22 @@ export async function sessionTerminalWs(app: FastifyInstance) {
 
     const rt = getRuntime();
     const handle: ContainerHandle = { id: pod.podId ?? pod.podName, name: pod.podName };
+
+    // Verify pod container is actually running before attempting exec
+    try {
+      const status = await rt.status(handle);
+      if (status.state !== "running") {
+        const message = `Pod is not running (state: ${status.state})${status.reason ? `: ${status.reason}` : ""}`;
+        socket.send(JSON.stringify({ error: message }));
+        socket.close();
+        return;
+      }
+    } catch (err) {
+      log.error({ err }, "Failed to check pod status");
+      socket.send(JSON.stringify({ error: "Failed to check pod status" }));
+      socket.close();
+      return;
+    }
 
     // Set up worktree and launch shell
     const worktreePath = session.worktreePath ?? "/workspace/repo";
