@@ -9,7 +9,14 @@ CREATE TABLE IF NOT EXISTS "optio_actions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "optio_actions" ADD CONSTRAINT "optio_actions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+DO $$ BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.table_constraints
+		WHERE constraint_name = 'optio_actions_user_id_users_id_fk'
+	) THEN
+		ALTER TABLE "optio_actions" ADD CONSTRAINT "optio_actions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+	END IF;
+END $$;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "optio_actions_user_id_idx" ON "optio_actions" USING btree ("user_id");
 --> statement-breakpoint

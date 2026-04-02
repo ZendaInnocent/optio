@@ -100,7 +100,6 @@ export async function buildServer() {
   await app.register(optioSettingsRoutes);
   await app.register(customImagesRoutes);
   await app.register(agentRoutes);
-  await app.register(agentRoutes);
 
   // WebSocket routes
   await app.register(logStreamWs);
