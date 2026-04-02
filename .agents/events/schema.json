@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Event Schema",
+  "version": "v1",
+  "description": "Event types and payloads for the event-sourced agent workflow system",
+  "eventTypes": {
+    "ThreadStarted": {
+      "description": "Initial event when a new agent thread begins",
+      "payload": {
+        "type": "object",
+        "required": ["agentType", "workspaceId", "initialContext"],
+        "properties": {
+          "agentType": { "type": "string", "enum": ["do-work", "plan", "review"] },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "initialContext": { "type": "object" },
+          "trigger": { "type": "string" }
+        }
+      }
+    },
+    "PhaseStarted": {
+      "description": "When a new phase begins execution",
+      "payload": {
+        "type": "object",
+        "required": ["phase", "tasks"],
+        "properties": {
+          "phase": { "type": "string", "enum": ["explore", "implement", "verify", "commit"] },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "description"],
+              "properties": {
+                "id": { "type": "string" },
+                "description": { "type": "string" },
+                "tests": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "TaskStarted": {
+      "description": "When a task begins execution",
+      "payload": {
+        "type": "object",
+        "required": ["taskId", "taskDescription"],
+        "properties": {
+          "taskId": { "type": "string" },
+          "taskDescription": { "type": "string" }
+        }
+      }
+    },
+    "TestWritten": {
+      "description": "When a test is written for a behavior",
+      "payload": {
+        "type": "object",
+        "required": ["testId", "testType", "behavior"],
+        "properties": {
+          "testId": { "type": "string" },
+          "testType": {
+            "type": "string",
+            "enum": ["unit", "integration", "schema", "config", "behavioral"]
+          },
+          "behavior": { "type": "string" },
+          "filePath": { "type": "string" }
+        }
+      }
+    },
+    "TestFailed": {
+      "description": "When a test fails (expected in TDD)",
+      "payload": {
+        "type": "object",
+        "required": ["testId", "error"],
+        "properties": {
+          "testId": { "type": "string" },
+          "error": { "type": "string" },
+          "stack": { "type": "string" }
+        }
+      }
+    },
+    "TestPassed": {
+      "description": "When a test passes",
+      "payload": {
+        "type": "object",
+        "required": ["testId", "duration"],
+        "properties": {
+          "testId": { "type": "string" },
+          "duration": { "type": "number" },
+          "retries": { "type": "number" }
+        }
+      }
+    },
+    "CheckStarted": {
+      "description": "When a verification check begins",
+      "payload": {
+        "type": "object",
+        "required": ["checkType"],
+        "properties": {
+          "checkType": {
+            "type": "string",
+            "enum": ["lint", "typecheck", "test", "browser", "schema"]
+          },
+          "target": { "type": "string" }
+        }
+      }
+    },
+    "CheckFailed": {
+      "description": "When a verification check fails",
+      "payload": {
+        "type": "object",
+        "required": ["checkType", "error"],
+        "properties": {
+          "checkType": { "type": "string" },
+          "error": { "type": "string" },
+          "logs": { "type": "string" },
+          "attempt": { "type": "number" }
+        }
+      }
+    },
+    "CheckRetrying": {
+      "description": "When a check is being retried",
+      "payload": {
+        "type": "object",
+        "required": ["checkType", "attempt", "maxAttempts"],
+        "properties": {
+          "checkType": { "type": "string" },
+          "attempt": { "type": "number" },
+          "maxAttempts": { "type": "number" }
+        }
+      }
+    },
+    "CheckPassed": {
+      "description": "When a verification check passes",
+      "payload": {
+        "type": "object",
+        "required": ["checkType"],
+        "properties": {
+          "checkType": { "type": "string" },
+          "duration": { "type": "number" }
+        }
+      }
+    },
+    "TaskCompleted": {
+      "description": "When a task completes successfully",
+      "payload": {
+        "type": "object",
+        "required": ["taskId"],
+        "properties": {
+          "taskId": { "type": "string" },
+          "testsAdded": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "PhaseCompleted": {
+      "description": "When a phase completes",
+      "payload": {
+        "type": "object",
+        "required": ["phase", "output"],
+        "properties": {
+          "phase": { "type": "string" },
+          "output": { "type": "object" },
+          "duration": { "type": "number" }
+        }
+      }
+    },
+    "CommitCreated": {
+      "description": "When a commit is made",
+      "payload": {
+        "type": "object",
+        "required": ["sha", "message", "issueRef"],
+        "properties": {
+          "sha": { "type": "string" },
+          "message": { "type": "string" },
+          "issueRef": { "type": "string" },
+          "files": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "ThreadPaused": {
+      "description": "When a thread is paused (manual or error)",
+      "payload": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": { "type": "string" },
+          "checkpointIndex": { "type": "number" }
+        }
+      }
+    },
+    "ThreadResumed": {
+      "description": "When a thread is resumed from pause",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "fromCheckpoint": { "type": "number" }
+        }
+      }
+    },
+    "ThreadForked": {
+      "description": "When a thread is forked",
+      "payload": {
+        "type": "object",
+        "required": ["newThreadId"],
+        "properties": {
+          "newThreadId": { "type": "string", "format": "uuid" },
+          "parentThreadId": { "type": "string", "format": "uuid" },
+          "forkPoint": { "type": "number" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "ThreadCompleted": {
+      "description": "When a thread completes successfully",
+      "payload": {
+        "type": "object",
+        "properties": {
+          "summary": { "type": "object" },
+          "commits": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "ThreadFailed": {
+      "description": "When a thread fails",
+      "payload": {
+        "type": "object",
+        "required": ["error", "lastPhase"],
+        "properties": {
+          "error": { "type": "string" },
+          "lastPhase": { "type": "string" },
+          "lastTask": { "type": "string" },
+          "suggestedFix": { "type": "string" }
+        }
+      }
+    },
+    "PlanDetected": {
+      "description": "When the agent detects a planning scenario",
+      "payload": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": { "type": "string" },
+          "suggestedPhases": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "ReviewDetected": {
+      "description": "When the agent detects a review scenario",
+      "payload": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": { "type": "string" },
+          "reviewTypes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "phases": {
+    "explore": {
+      "description": "Understand requirements and create plan",
+      "next": "implement"
+    },
+    "implement": {
+      "description": "Implement features using TDD",
+      "next": "verify"
+    },
+    "verify": {
+      "description": "Run all verification checks",
+      "next": "commit"
+    },
+    "commit": {
+      "description": "Create atomic commits",
+      "next": null
+    }
+  },
+  "checkTypes": ["lint", "typecheck", "test", "browser", "schema", "config"],
+  "testTypes": ["unit", "integration", "schema", "config", "behavioral"]
+}

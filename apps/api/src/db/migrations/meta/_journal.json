@@ -239,6 +239,27 @@
       "when": 1775836800000,
       "tag": "0033_optio_actions",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1775923200000,
+      "tag": "0034_optio_settings_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1776009600000,
+      "tag": "0035_repo_opencode_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1776096000000,
+      "tag": "0036_custom_images_and_permissions",
+      "breakpoints": true
     }
   ]
 }

@@ -659,3 +659,72 @@ export const promptTemplates = pgTable("prompt_templates", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── Agent Threads (Event Sourcing) ─────────────────────────────────────────────
+
+const agentThreadsBase = pgTable(
+  "agent_threads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    parentId: uuid("parent_id"),
+    workspaceId: uuid("workspace_id").notNull(),
+    agentType: text("agent_type").notNull().default("do-work"),
+    status: text("status").notNull().default("pending"),
+    currentPhase: text("current_phase"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("agent_threads_workspace_idx").on(table.workspaceId),
+    index("agent_threads_status_idx").on(table.status),
+    index("agent_threads_parent_idx").on(table.parentId),
+  ],
+);
+
+export const agentThreads = agentThreadsBase;
+export type AgentThread = typeof agentThreadsBase.$inferSelect;
+
+export const threadEventsBase = pgTable(
+  "thread_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    threadId: uuid("thread_id").notNull(),
+    eventType: text("event_type").notNull(),
+    eventVersion: text("event_version").notNull().default("v1"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("thread_events_thread_idx").on(table.threadId, table.createdAt),
+    index("thread_events_type_idx").on(table.eventType),
+  ],
+);
+
+export const threadEvents = threadEventsBase;
+export type ThreadEvent = typeof threadEventsBase.$inferSelect;
+
+export const threadSnapshots = pgTable(
+  "thread_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    threadId: uuid("thread_id").notNull(),
+    eventIndex: integer("event_index").notNull(),
+    phase: text("phase").notNull(),
+    state: jsonb("state").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("thread_snapshots_thread_idx").on(table.threadId, table.eventIndex)],
+);
+
+export type ThreadSnapshot = typeof threadSnapshots.$inferSelect;
+
+export const eventCorrections = pgTable("event_corrections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  originalEventId: uuid("original_event_id").notNull(),
+  correctedPayload: jsonb("corrected_payload").$type<Record<string, unknown>>().notNull(),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type EventCorrection = typeof eventCorrections.$inferSelect;

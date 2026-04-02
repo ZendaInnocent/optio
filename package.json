@@ -19,6 +19,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify:docker-build": "bash scripts/verify-docker-build.sh",
+    "eval:do-work": "node scripts/eval-do-work.js",
+    "eval:do-work:clarity": "node scripts/eval-do-work.js clarity",
+    "eval:do-work:enforceability": "node scripts/eval-do-work.js enforceability",
+    "eval:do-work:phase": "node scripts/eval-do-work.js phase",
+    "eval:do-work:anti-pattern": "node scripts/eval-do-work.js anti-pattern",
     "prepare": "husky"
   },
   "devDependencies": {
