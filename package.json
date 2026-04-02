@@ -24,6 +24,15 @@
     "eval:do-work:enforceability": "node scripts/eval-do-work.js enforceability",
     "eval:do-work:phase": "node scripts/eval-do-work.js phase",
     "eval:do-work:anti-pattern": "node scripts/eval-do-work.js anti-pattern",
+    "eval:prompts": "node scripts/eval-prompts.js",
+    "eval:prompts:do-work": "node scripts/eval-prompts.js do-work",
+    "eval:prompts:plan": "node scripts/eval-prompts.js plan",
+    "eval:prompts:review": "node scripts/eval-prompts.js review",
+    "eval:prompts:context": "node scripts/eval-prompts.js context",
+    "agent:list": "node scripts/run-agent.js list",
+    "agent:prompt": "node scripts/run-agent.js prompt",
+    "agent:run": "node scripts/run-agent.js run",
+    "agent:eval": "node scripts/run-agent.js eval",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -31,6 +31,7 @@ import { skillRoutes } from "./routes/skills.js";
 import { optioRoutes } from "./routes/optio.js";
 import { optioSettingsRoutes } from "./routes/optio-settings.js";
 import { customImagesRoutes } from "./routes/custom-images.js";
+import { agentRoutes } from "./routes/agents.js";
 import { logStreamWs } from "./ws/log-stream.js";
 import { eventsWs } from "./ws/events.js";
 import { sessionTerminalWs } from "./ws/session-terminal.js";
@@ -98,6 +99,8 @@ export async function buildServer() {
   await app.register(optioRoutes);
   await app.register(optioSettingsRoutes);
   await app.register(customImagesRoutes);
+  await app.register(agentRoutes);
+  await app.register(agentRoutes);
 
   // WebSocket routes
   await app.register(logStreamWs);
