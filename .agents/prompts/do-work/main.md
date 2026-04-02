@@ -1,6 +1,6 @@
 # Do Work - Modular Implementation Workflow
 
-> Version: v1.0.0
+> Version: v1.1.0
 > This prompt is modular. See `config.md` for tunable parameters.
 
 ## Overview
@@ -37,6 +37,12 @@ INCLUDE: phases/verify.md
 INCLUDE: phases/commit.md
 ```
 
+### Phase 5: Reflect & Improve
+
+```
+INCLUDE: phases/reflect.md
+```
+
 ## Hooks
 
 - **Before Phase**: `INCLUDE: ../../hooks/pre-phase.md`
@@ -58,6 +64,7 @@ INCLUDE: anti-patterns.md
 | 2. Implement | TDD loop          | `tdd_loop_enabled`        |
 | 3. Verify    | All checks pass   | `stop_on_failure`         |
 | 4. Commit    | Atomic commits    | `atomic_commits`          |
+| 5. Reflect   | Self-evaluate     | `enable_reflection`       |
 
 ---
 

@@ -4,7 +4,7 @@ All tunable parameters for the Do Work workflow. Toggle these to customize behav
 
 ## Version
 
-**v1.0.0**
+**v1.1.0**
 
 ## Enforcement Rules
 
@@ -68,6 +68,13 @@ All tunable parameters for the Do Work workflow. Toggle these to customize behav
 | `require_issue_link`         | boolean | true    | Must link to issue (Fix/Close/Resolve #X)  |
 | `atomic_commits`             | boolean | true    | One behavior per commit                    |
 | `update_ubiquitous_language` | boolean | true    | Update UBIQUITOUS_LANGUAGE.md if new terms |
+
+### Phase 5: Reflect
+
+| Parameter            | Type    | Default | Description                         |
+| -------------------- | ------- | ------- | ----------------------------------- |
+| `enable_reflection`  | boolean | true    | Run reflection phase after commit   |
+| `reflect_on_failure` | boolean | true    | Run reflection even when task fails |
 
 ## Anti-Patterns (Forced)
 

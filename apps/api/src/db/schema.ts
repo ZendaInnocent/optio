@@ -197,6 +197,25 @@ export const taskLogs = pgTable(
   (table) => [index("task_logs_task_id_timestamp_idx").on(table.taskId, table.timestamp)],
 );
 
+export const taskReflections = pgTable(
+  "task_reflections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id),
+    whatWorked: jsonb("what_worked").$type<string[]>(),
+    whatDidntWork: jsonb("what_didnt_work").$type<string[]>(),
+    improvements: jsonb("improvements").$type<string[]>(),
+    technicalDebt: jsonb("technical_debt").$type<string[]>(),
+    goalAchievement: text("goal_achievement"), // "complete" | "partial" | "failed"
+    processQuality: text("process_quality"), // "good" | "acceptable" | "poor"
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("task_reflections_task_id_idx").on(table.taskId)],
+);
+
 const bytea = customType<{ data: Buffer }>({
   dataType() {
     return "bytea";
@@ -389,8 +408,10 @@ export const interactiveSessions = pgTable(
     branch: text("branch").notNull(),
     state: interactiveSessionStateEnum("state").notNull().default("active"),
     podId: uuid("pod_id"),
+    agentType: text("agent_type"),
     costUsd: text("cost_usd"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
   },
   (table) => [

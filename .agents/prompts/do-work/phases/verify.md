@@ -19,6 +19,7 @@ When any check fails:
 ### Code Quality
 
 - Run pre-commit hooks (lint, typecheck)
+- **IMPORTANT**: Use `node scripts/run-silent.js` for all commands to reduce context waste. Do NOT run commands directly - always use the sandbox execution wrapper. See AGENTS.md for details.
 - All tests pass (unit, integration, schema, config)
 
 ### Browser Testing (config: `run_browser_tests`)

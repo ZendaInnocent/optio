@@ -4,7 +4,7 @@ Success metrics for evaluating prompt quality. These criteria validate that the 
 
 ## Version
 
-**v1.0.0** - Corresponds to do-work prompt v1.0.0
+**v1.1.0** - Corresponds to do-work prompt v1.1.0
 
 ## General Criteria
 
@@ -57,6 +57,14 @@ Success metrics for evaluating prompt quality. These criteria validate that the 
 | `issue_link_required`    | true      | All commits must reference issues         |
 | `atomic_commits`         | true      | One behavior per commit                   |
 | `domain_language_update` | true      | New terms added to UBIQUITOUS_LANGUAGE.md |
+
+### Phase 5: Reflect
+
+| Metric               | Threshold | Description                       |
+| -------------------- | --------- | --------------------------------- |
+| `reflection_run`     | true      | Reflection phase executed         |
+| `specific_learnings` | true      | Learnings are specific, not vague |
+| `action_items`       | true      | Concrete improvements identified  |
 
 ## Anti-Pattern Enforcement
 

@@ -42,7 +42,7 @@ const createTaskSchema = z.object({
   prompt: z.string().min(1),
   repoUrl: z.string().url(),
   repoBranch: z.string().optional(),
-  agentType: z.enum(["claude-code", "codex", "opencode"]),
+  agentType: z.enum(["claude-code", "codex", "opencode"]).optional(),
   ticketSource: z.string().optional(),
   ticketExternalId: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
@@ -473,4 +473,71 @@ export async function taskRoutes(app: FastifyInstance) {
     }
     reply.send({ ok: true, reordered: body.taskIds.length });
   });
+
+  // Create task reflection — member+
+  app.post(
+    "/api/tasks/:id/reflection",
+    { preHandler: [requireRole("member")] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const body = req.body as {
+        whatWorked?: string[];
+        whatDidntWork?: string[];
+        improvements?: string[];
+        technicalDebt?: string[];
+        goalAchievement?: "complete" | "partial" | "failed";
+        processQuality?: "good" | "acceptable" | "poor";
+        notes?: string;
+      };
+
+      const existing = await taskService.getTask(id);
+      if (!existing) {
+        return reply.status(404).send({ error: "Task not found" });
+      }
+
+      const reflection = await taskService.createTaskReflection({
+        taskId: id,
+        ...body,
+      });
+
+      reply.send({ reflection });
+    },
+  );
+
+  // Get task reflection — member+
+  app.get(
+    "/api/tasks/:id/reflection",
+    { preHandler: [requireRole("member")] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const reflection = await taskService.getTaskReflection(id);
+      reply.send({ reflection });
+    },
+  );
+
+  // Search reflections by pattern — member+
+  app.get(
+    "/api/reflections/search",
+    { preHandler: [requireRole("member")] },
+    async (req, reply) => {
+      const { q, limit } = req.query as { q?: string; limit?: string };
+      if (!q) {
+        return reply.status(400).send({ error: "Query parameter 'q' required" });
+      }
+      const reflections = await taskService.getReflectionsByPattern(q, {
+        limit: limit ? parseInt(limit, 10) : undefined,
+      });
+      reply.send({ reflections });
+    },
+  );
+
+  // Get reflection aggregate stats — member+
+  app.get(
+    "/api/reflections/aggregate",
+    { preHandler: [requireRole("member")] },
+    async (_req, reply) => {
+      const stats = await taskService.getReflectionsAggregate();
+      reply.send(stats);
+    },
+  );
 }

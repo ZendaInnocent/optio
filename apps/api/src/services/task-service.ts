@@ -1,11 +1,12 @@
 import { eq, desc, and, or, ilike, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { tasks, taskEvents, taskLogs, users } from "../db/schema.js";
+import { tasks, taskEvents, taskLogs, taskReflections, users } from "../db/schema.js";
 import { TaskState, transition, normalizeRepoUrl, type CreateTaskInput } from "@optio/shared";
 import { publishEvent } from "./event-bus.js";
 import { logger } from "../logger.js";
 import { enqueueWebhookEvent } from "../workers/webhook-worker.js";
 import type { WebhookEvent } from "./webhook-service.js";
+import { getSettings } from "./optio-settings-service.js";
 
 /**
  * Thrown when a state transition fails because another worker changed the
@@ -25,6 +26,9 @@ export class StateRaceError extends Error {
 }
 
 export async function createTask(input: CreateTaskInput & { workspaceId?: string | null }) {
+  // Determine agentType: use input value or fall back to workspace default
+  const agentType = input.agentType ?? (await getSettings(input.workspaceId ?? null)).defaultAgent;
+
   const [task] = await db
     .insert(tasks)
     .values({
@@ -32,7 +36,7 @@ export async function createTask(input: CreateTaskInput & { workspaceId?: string
       prompt: input.prompt,
       repoUrl: normalizeRepoUrl(input.repoUrl),
       repoBranch: input.repoBranch ?? "main",
-      agentType: input.agentType,
+      agentType,
       ticketSource: input.ticketSource,
       ticketExternalId: input.ticketExternalId,
       metadata: input.metadata,
@@ -586,4 +590,83 @@ export async function getRecentEvents(opts?: { limit?: number }) {
     .from(taskEvents)
     .orderBy(desc(taskEvents.createdAt))
     .limit(opts?.limit ?? 20);
+}
+
+export type CreateReflectionInput = {
+  taskId: string;
+  whatWorked?: string[];
+  whatDidntWork?: string[];
+  improvements?: string[];
+  technicalDebt?: string[];
+  goalAchievement?: "complete" | "partial" | "failed";
+  processQuality?: "good" | "acceptable" | "poor";
+  notes?: string;
+};
+
+export async function createTaskReflection(input: CreateReflectionInput) {
+  const [reflection] = await db
+    .insert(taskReflections)
+    .values({
+      taskId: input.taskId,
+      whatWorked: input.whatWorked ?? [],
+      whatDidntWork: input.whatDidntWork ?? [],
+      improvements: input.improvements ?? [],
+      technicalDebt: input.technicalDebt ?? [],
+      goalAchievement: input.goalAchievement,
+      processQuality: input.processQuality,
+      notes: input.notes,
+    })
+    .returning();
+  return reflection;
+}
+
+export async function getTaskReflection(taskId: string) {
+  const [reflection] = await db
+    .select()
+    .from(taskReflections)
+    .where(eq(taskReflections.taskId, taskId));
+  return reflection ?? null;
+}
+
+export async function getReflectionsByPattern(pattern: string, opts?: { limit?: number }) {
+  const searchPattern = `%${pattern}%`;
+  return db
+    .select()
+    .from(taskReflections)
+    .where(
+      or(
+        sql`${taskReflections.whatWorked}::text LIKE ${searchPattern}`,
+        sql`${taskReflections.whatDidntWork}::text LIKE ${searchPattern}`,
+        sql`${taskReflections.improvements}::text LIKE ${searchPattern}`,
+        sql`${taskReflections.technicalDebt}::text LIKE ${searchPattern}`,
+      ),
+    )
+    .limit(opts?.limit ?? 20);
+}
+
+export async function getReflectionsAggregate() {
+  const result = await db
+    .select({
+      goalAchievement: taskReflections.goalAchievement,
+      processQuality: taskReflections.processQuality,
+    })
+    .from(taskReflections);
+
+  const totals = { complete: 0, partial: 0, failed: 0 };
+  const quality = { good: 0, acceptable: 0, poor: 0 };
+
+  for (const r of result) {
+    if (r.goalAchievement && r.goalAchievement in totals) {
+      totals[r.goalAchievement as keyof typeof totals]++;
+    }
+    if (r.processQuality && r.processQuality in quality) {
+      quality[r.processQuality as keyof typeof quality]++;
+    }
+  }
+
+  return {
+    totalReflections: result.length,
+    goalAchievement: totals,
+    processQuality: quality,
+  };
 }

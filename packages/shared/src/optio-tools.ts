@@ -433,6 +433,121 @@ const get_cost_analytics: OptioToolSchema = {
   },
 };
 
+// ─── Reflection Tools ───────────────────────────────────────────────────────
+
+const create_reflection: OptioToolSchema = {
+  name: "create_reflection",
+  description:
+    "Record a self-evaluation after task completion. Captures what worked, what didn't, " +
+    "improvements for future tasks, and any technical debt identified.",
+  category: "Tasks",
+  endpoint: "POST /api/tasks/:id/reflection",
+  method: "POST",
+  input_schema: {
+    type: "object",
+    properties: {
+      taskId: {
+        type: "string",
+        description: "The task ID to record reflection for",
+      },
+      whatWorked: {
+        type: "array",
+        items: { type: "string" },
+        description: "List of approaches that worked well",
+      },
+      whatDidntWork: {
+        type: "array",
+        items: { type: "string" },
+        description: "List of mistakes or inefficiencies",
+      },
+      improvements: {
+        type: "array",
+        items: { type: "string" },
+        description: "Specific improvements for future tasks",
+      },
+      technicalDebt: {
+        type: "array",
+        items: { type: "string" },
+        description: "Technical debt items to address later",
+      },
+      goalAchievement: {
+        type: "string",
+        description: "How well the task goal was achieved",
+        enum: ["complete", "partial", "failed"],
+      },
+      processQuality: {
+        type: "string",
+        description: "Quality of the implementation process",
+        enum: ["good", "acceptable", "poor"],
+      },
+      notes: {
+        type: "string",
+        description: "Additional notes or observations",
+      },
+    },
+    required: ["taskId"],
+  },
+};
+
+const get_reflection: OptioToolSchema = {
+  name: "get_reflection",
+  description: "Get the reflection recorded for a specific task.",
+  category: "Tasks",
+  endpoint: "GET /api/tasks/:id/reflection",
+  method: "GET",
+  input_schema: {
+    type: "object",
+    properties: {
+      taskId: {
+        type: "string",
+        description: "The task ID to get reflection for",
+      },
+    },
+    required: ["taskId"],
+  },
+};
+
+const search_reflections: OptioToolSchema = {
+  name: "search_reflections",
+  description:
+    "Search reflections across tasks by pattern. Useful for finding common issues " +
+    "or identifying systemic patterns in agent behavior.",
+  category: "Tasks",
+  endpoint: "GET /api/reflections/search",
+  method: "GET",
+  input_schema: {
+    type: "object",
+    properties: {
+      q: {
+        type: "string",
+        description: "Search pattern to match against reflection content",
+      },
+      limit: {
+        type: "number",
+        description: "Maximum number of results",
+        default: 20,
+        minimum: 1,
+        maximum: 100,
+      },
+    },
+    required: ["q"],
+  },
+};
+
+const get_reflection_stats: OptioToolSchema = {
+  name: "get_reflection_stats",
+  description:
+    "Get aggregated statistics from all reflections. Shows distribution of goal achievement " +
+    "and process quality across all tasks - useful for identifying agent performance trends.",
+  category: "Tasks",
+  endpoint: "GET /api/reflections/aggregate",
+  method: "GET",
+  input_schema: {
+    type: "object",
+    properties: {},
+  },
+};
+
 // ─── System Tools ───────────────────────────────────────────────────────────
 
 const get_system_status: OptioToolSchema = {
@@ -489,7 +604,7 @@ const watch_task: OptioToolSchema = {
 
 // ─── Exports ────────────────────────────────────────────────────────────────
 
-/** All 18 Optio tool definitions. */
+/** All 22 Optio tool definitions. */
 export const OPTIO_TOOL_SCHEMAS: OptioToolSchema[] = [
   // Tasks (8)
   list_tasks,
@@ -500,6 +615,11 @@ export const OPTIO_TOOL_SCHEMAS: OptioToolSchema[] = [
   bulk_retry_failed,
   bulk_cancel_active,
   get_task_logs,
+  // Reflections (4)
+  create_reflection,
+  get_reflection,
+  search_reflections,
+  get_reflection_stats,
   // Repos (3)
   list_repos,
   get_repo,
