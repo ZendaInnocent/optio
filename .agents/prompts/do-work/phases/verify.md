@@ -3,6 +3,7 @@
 ## Goal
 
 Ensure all checks pass before moving to commit.
+Use subagent orchestration to automate and parallelize verification.
 
 ## Enforcement Rule (CRITICAL)
 
@@ -14,7 +15,46 @@ When any check fails:
 4. **REPEAT** - Until all checks pass
 5. **ONLY THEN** - Proceed to next task
 
-## Check Types
+## Subagent Delegation (if enabled)
+
+If `use_subagent_orchestration` is `true`:
+
+### Parallel Verification
+
+Delegate different check types to separate sub-agents:
+
+- **Lint/Typecheck sub-agent**: Runs `pnpm lint` and `pnpm typecheck`
+- **Test sub-agent**: Runs all test suites (unit, integration, schema, config)
+- **Browser sub-agent**: Runs UI tests with `chrome-devtools-mcp`
+- **Performance sub-agent**: Benchmarks and compares metrics
+
+Launch all simultaneously, aggregate results. Fail fast on any failure.
+
+### Command Execution
+
+All checks MUST use `node scripts/run-silent.js` wrapper to minimize context waste.
+Delegate to `Bash` sub-agent for commands that produce large output.
+
+### Retry Handling
+
+If `retry_on_failure` enabled:
+
+- Sub-agent automatically retries failed checks once
+- Captures diagnostic logs for failures
+- Reports root cause analysis
+
+### Browser Testing
+
+For UI features, delegate to sub-agent with `chrome-devtools-mcp` access:
+
+- Verify correct rendering
+- Test user interactions
+- Check for console errors
+- Validate accessibility
+
+## Manual Verification
+
+If `use_subagent_orchestration` is `false`:
 
 ### Code Quality
 
@@ -48,3 +88,4 @@ When any check fails:
 - [ ] All tests pass (unit, integration, schema, config)
 - [ ] Browser tests pass (if UI feature)
 - [ ] No console errors in browser
+- [ ] Subagent verification complete (if enabled)

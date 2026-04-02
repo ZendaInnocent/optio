@@ -1,15 +1,45 @@
 # Do Work - Modular Implementation Workflow
 
-> Version: v1.1.0
+> Version: v1.2.0
 > This prompt is modular. See `config.md` for tunable parameters.
+> **Default: Subagent Orchestration enabled** - delegate research, analysis, and parallel tasks to specialized sub-agents.
 
 ## Overview
 
 Complete implementation workflow from exploration to commit using TDD with vertical slices.
+This prompt uses **subagent orchestration by default** to maximize efficiency and quality.
 
-## Configuration
+## Subagent Orchestration (Default)
 
-All tunable parameters are in `config.md`. Default values enforce strict quality.
+When `use_subagent_orchestration` is enabled (default: `true`):
+
+### Delegation Strategy
+
+1. **Codebase Analysis**: Delegate to `codebase-analyzer` and `codebase-locator` sub-agents
+   - Use for: finding patterns, understanding architecture, locating components
+   - Parallelize independent analyses
+
+2. **Bash-Intensive Tasks**: Delegate to `Bash` sub-agent
+   - Use for: commands producing large output (aws CLI, gh CLI, log digging)
+   - Keeps main thread context clean
+
+3. **Coordinated Work**: Launch multiple sub-agents for independent tasks
+   - Track results in master thread
+   - Synthesize findings into coherent plan
+
+### When to Delegate
+
+- System understanding required
+- Multiple independent research paths
+- Heavy command-line operations
+- Pattern discovery across codebase
+- Parallel task execution
+
+### Configuration
+
+Controlled via `use_subagent_orchestration` in `config.md` (default: `true`).
+
+---
 
 ## Workflow Execution
 
@@ -58,13 +88,13 @@ INCLUDE: anti-patterns.md
 
 ## Quick Reference
 
-| Phase        | Goal              | Key Config                |
-| ------------ | ----------------- | ------------------------- |
-| 1. Explore   | Understand + plan | `require_validation_test` |
-| 2. Implement | TDD loop          | `tdd_loop_enabled`        |
-| 3. Verify    | All checks pass   | `stop_on_failure`         |
-| 4. Commit    | Atomic commits    | `atomic_commits`          |
-| 5. Reflect   | Self-evaluate     | `enable_reflection`       |
+| Phase        | Goal              | Key Config                                              |
+| ------------ | ----------------- | ------------------------------------------------------- |
+| 1. Explore   | Understand + plan | `require_validation_test`, `use_subagent_orchestration` |
+| 2. Implement | TDD loop          | `tdd_loop_enabled`, `use_subagent_orchestration`        |
+| 3. Verify    | All checks pass   | `stop_on_failure`, `use_subagent_orchestration`         |
+| 4. Commit    | Atomic commits    | `atomic_commits`                                        |
+| 5. Reflect   | Self-evaluate     | `enable_reflection`                                     |
 
 ---
 

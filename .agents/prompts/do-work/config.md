@@ -4,7 +4,13 @@ All tunable parameters for the Do Work workflow. Toggle these to customize behav
 
 ## Version
 
-**v1.1.0**
+**v1.2.0**
+
+## Orchestration Settings
+
+| Parameter                    | Type    | Default | Description                                        |
+| ---------------------------- | ------- | ------- | -------------------------------------------------- |
+| `use_subagent_orchestration` | boolean | true    | Enable subagent delegation for analysis & research |
 
 ## Enforcement Rules
 
