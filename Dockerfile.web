@@ -1,6 +1,8 @@
 # ---- Dependencies stage ----
 FROM node:22-slim AS deps
 
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@10 --activate
 
 WORKDIR /app
@@ -19,8 +21,8 @@ COPY packages/ticket-providers/package.json packages/ticket-providers/tsconfig.j
 # Ensure devDependencies are installed for all workspace packages
 ENV NPM_CONFIG_PRODUCTION=false
 
-# Install all dependencies
-RUN pnpm install --frozen-lockfile
+# Install all dependencies with persistent pnpm cache
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Verify TypeScript is installed for the shared package
 RUN test -d packages/shared/node_modules/typescript || (echo "TypeScript not installed in @optio/shared" && exit 1)

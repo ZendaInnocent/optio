@@ -1,5 +1,5 @@
 # -*- mode: Python -*-
-# Tiltfile for Optio - Kubernetes-native development
+# Tiltfile for Optio — Kubernetes-native development
 #
 # Usage:
 #   tilt up          # Start development
@@ -17,19 +17,47 @@
 # ──────────────────────────────────────────────────────────────────────────────
 allow_k8s_contexts("docker-desktop")
 
-# Namespace for all resources
 namespace = "optio"
-
-# Helm release name
 release_name = "optio"
-
-# Port mappings (match your existing setup)
 api_node_port = 30400
 web_node_port = 30310
 
 # ──────────────────────────────────────────────────────────────────────────────
-# API Image (dev)
-# Uses Dockerfile.api.dev which runs tsx watch for auto-restart
+# Base Image — all workspace dependencies
+# Only rebuilds when package.json or pnpm-lock.yaml changes.
+# Both api and web dev images FROM this.
+# ──────────────────────────────────────────────────────────────────────────────
+docker_build(
+    "optio-base",
+    ".",
+    dockerfile="Dockerfile.base",
+    # Only watch files that affect dependency install
+    only=[
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        "tsconfig.base.json",
+        "apps/api/package.json",
+        "apps/api/tsconfig.json",
+        "apps/web/package.json",
+        "apps/web/tsconfig.json",
+        "packages/shared/package.json",
+        "packages/shared/tsconfig.json",
+        "packages/container-runtime/package.json",
+        "packages/container-runtime/tsconfig.json",
+        "packages/agent-adapters/package.json",
+        "packages/agent-adapters/tsconfig.json",
+        "packages/ticket-providers/package.json",
+        "packages/ticket-providers/tsconfig.json",
+        "packages/image-builder/package.json",
+        "packages/image-builder/tsconfig.json",
+    ],
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# API Image (dev) — FROM optio-base, runs tsx watch
+# Source changes are synced via live_update (no rebuild needed).
 # ──────────────────────────────────────────────────────────────────────────────
 docker_build(
     "optio-api",
@@ -42,8 +70,8 @@ docker_build(
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Web Image (dev)
-# Uses Dockerfile.web.dev which runs next dev for HMR
+# Web Image (dev) — FROM optio-base, runs Next.js dev server
+# Source changes are synced via live_update (no rebuild needed).
 # ──────────────────────────────────────────────────────────────────────────────
 docker_build(
     "optio-web",
@@ -60,7 +88,6 @@ docker_build(
 # Uses helm template to generate manifests, then k8s_yaml to apply them.
 # This avoids Windows path issues with Tilt's helm() function.
 # ──────────────────────────────────────────────────────────────────────────────
-# Generate a deterministic dev encryption key (only used locally)
 dev_encryption_key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 helm_values = [
@@ -89,10 +116,12 @@ if helm_output:
 # ──────────────────────────────────────────────────────────────────────────────
 k8s_resource(
     release_name + "-api",
-    port_forwards=[api_node_port],
+    port_forwards=[str(api_node_port) + ":4000"],
+    resource_deps=[release_name + "-postgres", release_name + "-redis"],
 )
 
 k8s_resource(
     release_name + "-web",
-    port_forwards=[web_node_port],
+    port_forwards=[str(web_node_port) + ":3000"],
+    resource_deps=[release_name + "-api"],
 )

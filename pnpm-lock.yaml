@@ -248,10 +248,11 @@ importers:
         version: 5.9.3
 
   packages/image-builder:
-    devDependencies:
+    dependencies:
       '@optio/shared':
         specifier: workspace:*
         version: link:../shared
+    devDependencies:
       '@types/node':
         specifier: ^22.15.0
         version: 22.19.15
