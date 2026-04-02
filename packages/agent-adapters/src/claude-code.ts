@@ -1,17 +1,35 @@
 import type { AgentTaskInput, AgentContainerConfig, AgentResult } from "@optio/shared";
 import { TASK_BRANCH_PREFIX } from "@optio/shared";
-import type { AgentAdapter } from "./types.js";
+import type { AgentAdapter, AgentExecCommand } from "./types.js";
 
 export class ClaudeCodeAdapter implements AgentAdapter {
   readonly type = "claude-code";
   readonly displayName = "Claude Code";
 
   validateSecrets(availableSecrets: string[]): { valid: boolean; missing: string[] } {
-    // GITHUB_TOKEN is always required
-    // ANTHROPIC_API_KEY is only required in api-key mode (checked at runtime)
     const required = ["GITHUB_TOKEN"];
     const missing = required.filter((s) => !availableSecrets.includes(s));
     return { valid: missing.length === 0, missing };
+  }
+
+  getExecCommand(
+    prompt: string,
+    model?: string,
+    authEnv?: Record<string, string>,
+  ): AgentExecCommand {
+    const escapedPrompt = prompt.replace(/'/g, "'\\''");
+    const modelFlag = model ? `--model ${model}` : "";
+    const script = [
+      "set -e",
+      ...Object.entries(authEnv ?? {}).map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\\''")}'`),
+      `claude -p '${escapedPrompt}' ${modelFlag} --output-format stream-json --verbose --dangerously-skip-permissions 2>&1 || true`,
+    ].join(" && ");
+
+    return {
+      command: "bash",
+      args: ["-c", script],
+      env: authEnv ?? {},
+    };
   }
 
   buildContainerConfig(input: AgentTaskInput): AgentContainerConfig {

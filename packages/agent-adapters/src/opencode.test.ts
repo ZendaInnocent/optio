@@ -237,4 +237,51 @@ describe("OpencodeAdapter", () => {
       expect(result2.error).toBe("Error: OPENCODE_API_KEY is invalid");
     });
   });
+
+  describe("getExecCommand", () => {
+    it("returns bash -c with the opencode run command", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.command).toBe("bash");
+      expect(result.args[0]).toBe("-c");
+      expect(result.args[1]).toContain("opencode run");
+    });
+
+    it("escapes single quotes in prompt", () => {
+      const result = adapter.getExecCommand("test 'prompt' with quotes");
+
+      expect(result.args[1]).toContain("'\\''");
+    });
+
+    it("includes model flag when model is provided", () => {
+      const result = adapter.getExecCommand("test prompt", "anthropic/claude-sonnet-4-20250514");
+
+      expect(result.args[1]).toContain("--model anthropic/claude-sonnet-4-20250514");
+    });
+
+    it("does not include model flag when model is undefined", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).not.toContain("--model");
+    });
+
+    it("includes auth env vars when provided", () => {
+      const authEnv = { OPENCODE_API_KEY: "sk-test" };
+      const result = adapter.getExecCommand("test prompt", undefined, authEnv);
+
+      expect(result.args[1]).toContain("export OPENCODE_API_KEY='sk-test'");
+    });
+
+    it("uses set -e in script", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).toContain("set -e");
+    });
+
+    it("uses --format json for structured output", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).toContain("--format json");
+    });
+  });
 });

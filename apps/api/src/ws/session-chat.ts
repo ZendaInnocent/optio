@@ -8,8 +8,9 @@ import { eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 import { parseClaudeEvent } from "../services/agent-event-parser.js";
 import { publishSessionEvent } from "../services/event-bus.js";
-import type { ExecSession, OptioSettings } from "@optio/shared";
+import type { ExecSession, OptioSettings, AgentType } from "@optio/shared";
 import { extractSessionToken } from "./ws-auth.js";
+import { getAdapter } from "@optio/agent-adapters";
 
 /**
  * Session chat WebSocket handler.
@@ -72,6 +73,17 @@ export async function sessionChatWs(app: FastifyInstance) {
     const workspaceId = req.user?.workspaceId ?? null;
     const optioSettings = await getSettings(workspaceId);
 
+    // Get the agent adapter based on settings
+    let currentAgentType = optioSettings.defaultAgent || "opencode";
+    let adapter = getAdapter(currentAgentType);
+    if (!adapter) {
+      socket.send(
+        JSON.stringify({ type: "error", message: `Unknown agent type: ${currentAgentType}` }),
+      );
+      socket.close();
+      return;
+    }
+
     // Optio settings take precedence, then repo config, then default
     let currentModel = optioSettings.model || repoConfig?.claudeModel || "sonnet";
 
@@ -99,6 +111,7 @@ export async function sessionChatWs(app: FastifyInstance) {
       type: "status",
       status: "ready",
       model: currentModel,
+      agentType: currentAgentType,
       costUsd: cumulativeCost,
       settings: {
         maxTurns: optioSettings.maxTurns,
@@ -137,10 +150,6 @@ export async function sessionChatWs(app: FastifyInstance) {
         fullPrompt = `${prompt}\n\n[Additional instructions: ${optioSettings.systemPrompt}]`;
       }
 
-      // Build the claude command
-      const escapedPrompt = fullPrompt.replace(/'/g, "'\\''");
-      const modelFlag = currentModel ? `--model ${currentModel}` : "";
-
       // Build auth passthrough env vars so the agent can make
       // authenticated API calls on behalf of the requesting user.
       const passthroughEnv: Record<string, string> = {};
@@ -152,20 +161,20 @@ export async function sessionChatWs(app: FastifyInstance) {
         passthroughEnv.OPTIO_API_URL = apiUrl;
       }
 
+      // Merge auth env with passthrough env
+      const mergedEnv = { ...authEnv, ...passthroughEnv };
+
+      // Get the execution command from the adapter
+      const execCmd = adapter.getExecCommand(fullPrompt, currentModel, mergedEnv);
+
       const script = [
         "set -e",
         // Wait for repo to be ready
         "for i in $(seq 1 30); do [ -f /workspace/.ready ] && break; sleep 1; done",
         '[ -f /workspace/.ready ] || { echo "Repo not ready"; exit 1; }',
         `cd "${worktreePath}"`,
-        // Set auth env vars for the Claude process
-        ...Object.entries(authEnv).map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\\''")}'`),
-        // Set auth passthrough env vars for Optio API calls
-        ...Object.entries(passthroughEnv).map(
-          ([k, v]) => `export ${k}='${v.replace(/'/g, "'\\''")}'`,
-        ),
-        // Run claude in one-shot prompt mode with streaming JSON output
-        `claude -p '${escapedPrompt}' ${modelFlag} --output-format stream-json --verbose --dangerously-skip-permissions 2>&1 || true`,
+        // Run the agent command
+        `${execCmd.command} ${execCmd.args.join(" ")}`,
       ].join("\n");
 
       try {
@@ -241,7 +250,7 @@ export async function sessionChatWs(app: FastifyInstance) {
     socket.on("message", (data: Buffer | string) => {
       const str = typeof data === "string" ? data : data.toString("utf-8");
 
-      let msg: { type: string; content?: string; model?: string };
+      let msg: { type: string; content?: string; model?: string; agentType?: string };
       try {
         msg = JSON.parse(str);
       } catch {
@@ -281,6 +290,24 @@ export async function sessionChatWs(app: FastifyInstance) {
               status: isProcessing ? "thinking" : "idle",
               model: currentModel,
             });
+          }
+          break;
+
+        case "set_agent":
+          if (msg.agentType) {
+            const newAdapter = getAdapter(msg.agentType as AgentType);
+            if (newAdapter) {
+              currentAgentType = msg.agentType as AgentType;
+              adapter = newAdapter;
+              log.info({ agentType: currentAgentType }, "Agent changed");
+              send({
+                type: "status",
+                status: isProcessing ? "thinking" : "idle",
+                agentType: currentAgentType,
+              });
+            } else {
+              send({ type: "error", message: `Unknown agent type: ${msg.agentType}` });
+            }
           }
           break;
 

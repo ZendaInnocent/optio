@@ -1,6 +1,6 @@
 import type { AgentTaskInput, AgentContainerConfig, AgentResult } from "@optio/shared";
 import { TASK_BRANCH_PREFIX } from "@optio/shared";
-import type { AgentAdapter } from "./types.js";
+import type { AgentAdapter, AgentExecCommand } from "./types.js";
 
 /** OpenCode model pricing (USD per 1M tokens) */
 const OPENCODE_MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -29,6 +29,26 @@ export class OpencodeAdapter implements AgentAdapter {
     const required = ["GITHUB_TOKEN"];
     const missing = required.filter((s) => !availableSecrets.includes(s));
     return { valid: missing.length === 0, missing };
+  }
+
+  getExecCommand(
+    prompt: string,
+    model?: string,
+    authEnv?: Record<string, string>,
+  ): AgentExecCommand {
+    const escapedPrompt = prompt.replace(/'/g, "'\\''");
+    const modelFlag = model ? `--model ${model}` : "";
+    const script = [
+      "set -e",
+      ...Object.entries(authEnv ?? {}).map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\\''")}'`),
+      `opencode run '${escapedPrompt}' ${modelFlag} --format json 2>&1 || true`,
+    ].join(" && ");
+
+    return {
+      command: "bash",
+      args: ["-c", script],
+      env: authEnv ?? {},
+    };
   }
 
   buildContainerConfig(input: AgentTaskInput): AgentContainerConfig {

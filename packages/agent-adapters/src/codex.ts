@@ -5,7 +5,7 @@ import type {
   CodexAuthMode,
 } from "@optio/shared";
 import { TASK_BRANCH_PREFIX } from "@optio/shared";
-import type { AgentAdapter } from "./types.js";
+import type { AgentAdapter, AgentExecCommand } from "./types.js";
 
 /**
  * Codex CLI (codex exec --full-auto --json) outputs NDJSON events.
@@ -43,13 +43,31 @@ export class CodexAdapter implements AgentAdapter {
     codexAuthMode?: CodexAuthMode,
   ): { valid: boolean; missing: string[] } {
     const required: string[] = ["GITHUB_TOKEN"];
-    // In app-server mode, no OpenAI API key is needed — the CLI connects to
-    // a local app-server endpoint that handles auth via the user's ChatGPT plan.
     if (codexAuthMode !== "app-server") {
       required.push("OPENAI_API_KEY");
     }
     const missing = required.filter((s) => !availableSecrets.includes(s));
     return { valid: missing.length === 0, missing };
+  }
+
+  getExecCommand(
+    prompt: string,
+    model?: string,
+    authEnv?: Record<string, string>,
+  ): AgentExecCommand {
+    const escapedPrompt = prompt.replace(/'/g, "'\\''");
+    const modelFlag = model ? `--model ${model}` : "";
+    const script = [
+      "set -e",
+      ...Object.entries(authEnv ?? {}).map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\\''")}'`),
+      `codex exec --full-auto '${escapedPrompt}' ${modelFlag} --json 2>&1 || true`,
+    ].join(" && ");
+
+    return {
+      command: "bash",
+      args: ["-c", script],
+      env: authEnv ?? {},
+    };
   }
 
   buildContainerConfig(input: AgentTaskInput): AgentContainerConfig {

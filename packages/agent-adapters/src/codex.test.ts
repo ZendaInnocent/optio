@@ -292,4 +292,57 @@ describe("CodexAdapter", () => {
       expect(result.error).toContain("503");
     });
   });
+
+  describe("getExecCommand", () => {
+    it("returns bash -c with the codex exec command", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.command).toBe("bash");
+      expect(result.args[0]).toBe("-c");
+      expect(result.args[1]).toContain("codex exec");
+    });
+
+    it("uses --full-auto flag for non-interactive mode", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).toContain("--full-auto");
+    });
+
+    it("escapes single quotes in prompt", () => {
+      const result = adapter.getExecCommand("test 'prompt' with quotes");
+
+      expect(result.args[1]).toContain("'\\''");
+    });
+
+    it("includes model flag when model is provided", () => {
+      const result = adapter.getExecCommand("test prompt", "codex-mini");
+
+      expect(result.args[1]).toContain("--model codex-mini");
+    });
+
+    it("does not include model flag when model is undefined", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).not.toContain("--model");
+    });
+
+    it("includes auth env vars when provided", () => {
+      const authEnv = { OPENAI_API_KEY: "sk-test" };
+      const result = adapter.getExecCommand("test prompt", undefined, authEnv);
+
+      expect(result.args[1]).toContain("export OPENAI_API_KEY='sk-test'");
+    });
+
+    it("uses set -e in script", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).toContain("set -e");
+    });
+
+    it("uses --json for structured output", () => {
+      const result = adapter.getExecCommand("test prompt");
+
+      expect(result.args[1]).toContain("--json");
+    });
+  });
 });
