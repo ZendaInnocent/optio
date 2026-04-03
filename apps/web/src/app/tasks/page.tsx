@@ -7,7 +7,17 @@ import { api } from "@/lib/api-client";
 import { toast } from "sonner";
 import Link from "next/link";
 import { cn, formatRelativeTime } from "@/lib/utils";
-import { Plus, RotateCcw, XCircle, Loader2, Zap, GitBranch, CircleDot, Check } from "lucide-react";
+import {
+  Plus,
+  RotateCcw,
+  XCircle,
+  Loader2,
+  Zap,
+  GitBranch,
+  CircleDot,
+  Check,
+  X,
+} from "lucide-react";
 
 export default function TasksPage() {
   usePageTitle("Tasks");
@@ -124,6 +134,16 @@ function IssuesBrowser() {
   const [assigning, setAssigning] = useState<number | null>(null);
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSecretForm, setShowSecretForm] = useState(false);
+  const [secretForm, setSecretForm] = useState({
+    name: "GITHUB_TOKEN",
+    value: "",
+    scope: "global",
+  });
+  const [secretSubmitting, setSecretSubmitting] = useState(false);
+
+  const isTokenError =
+    error?.includes("token") || error?.includes("Token") || error?.includes("GITHUB");
 
   useEffect(() => {
     api
@@ -204,6 +224,31 @@ function IssuesBrowser() {
     setAssigning(null);
   };
 
+  const handleSaveSecret = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecretSubmitting(true);
+    try {
+      await api.createSecret(secretForm);
+      toast.success("GitHub token saved", {
+        description: "Your token has been encrypted and stored.",
+      });
+      setShowSecretForm(false);
+      setError(null);
+      setLoading(true);
+      api
+        .listIssues({ repoId: selectedRepo || undefined })
+        .then((res) => setIssues(res.issues))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    } catch (err) {
+      toast.error("Failed to save token", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setSecretSubmitting(false);
+    }
+  };
+
   return (
     <div>
       {/* Repo filter */}
@@ -247,16 +292,24 @@ function IssuesBrowser() {
           <Loader2 className="w-5 h-5 animate-spin mr-2" />
           Loading issues from GitHub...
         </div>
-      ) : error ? (
+      ) : isTokenError ? (
         <div className="text-center py-12 text-text-muted border border-dashed border-border rounded-lg">
           <CircleDot className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>GitHub token required</p>
           <p className="text-xs mt-1">
-            Add a GitHub token in{" "}
-            <Link href="/settings" className="text-primary hover:text-primary-hover">
-              Settings → Secrets
-            </Link>
+            <button
+              onClick={() => setShowSecretForm(true)}
+              className="text-primary hover:text-primary-hover"
+            >
+              Click here to add a GitHub token
+            </button>
           </p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12 text-text-muted border border-dashed border-border rounded-lg">
+          <CircleDot className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm font-medium">Error loading issues</p>
+          <p className="text-xs mt-1 text-text-muted">{error}</p>
         </div>
       ) : issues.length === 0 ? (
         <div className="text-center py-12 text-text-muted border border-dashed border-border rounded-lg">
@@ -348,6 +401,77 @@ function IssuesBrowser() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Secret form modal */}
+      {showSecretForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSecretForm(false)} />
+          <div className="relative z-10 w-full max-w-md p-6 rounded-xl border border-border/50 bg-bg-card shadow-xl">
+            <button
+              onClick={() => setShowSecretForm(false)}
+              className="absolute top-4 right-4 p-1 rounded-md text-text-muted hover:text-text hover:bg-bg-hover"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold mb-1">Add GitHub Token</h2>
+            <p className="text-sm text-text-muted mb-4">
+              Add a GitHub personal access token to fetch issues.
+            </p>
+            <form onSubmit={handleSaveSecret} className="space-y-4">
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Name</label>
+                <input
+                  value={secretForm.name}
+                  disabled
+                  className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm text-text-muted cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Scope</label>
+                <select
+                  value={secretForm.scope}
+                  onChange={(e) => setSecretForm((f) => ({ ...f, scope: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                >
+                  <option value="global">Global (all repos)</option>
+                  {repos.map((repo) => (
+                    <option key={repo.id} value={repo.repoUrl}>
+                      {repo.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Token</label>
+                <input
+                  required
+                  type="password"
+                  value={secretForm.value}
+                  onChange={(e) => setSecretForm((f) => ({ ...f, value: e.target.value }))}
+                  placeholder="ghp_..."
+                  className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={secretSubmitting}
+                  className="flex-1 px-4 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
+                >
+                  {secretSubmitting ? "Saving..." : "Save Token"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSecretForm(false)}
+                  className="px-4 py-2 rounded-md bg-bg-hover text-text-muted text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -117,7 +117,7 @@ export function SecretsSection() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-4">
       {/* Required secrets banner */}
       {optioSettings?.agents && requiredSecrets.length > 0 && (
         <div className="p-4 rounded-xl border border-border/50 bg-bg-card">

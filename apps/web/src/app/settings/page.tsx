@@ -19,8 +19,10 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  KeyRound,
 } from "lucide-react";
 import { OPTIO_TOOL_CATEGORIES, ALL_OPTIO_TOOL_NAMES, AGENT_DEFINITIONS } from "@optio/shared";
+import { SecretsSection } from "@/components/settings/secrets-section";
 
 function PromptTemplateEditor() {
   const [template, setTemplate] = useState("");
@@ -1172,6 +1174,15 @@ export default function SettingsPage() {
           Agent Configuration
         </h2>
         <AgentConfiguration />
+      </section>
+
+      {/* Secrets */}
+      <section>
+        <h2 className="text-sm font-medium text-text-muted mb-3 flex items-center gap-2">
+          <KeyRound className="w-4 h-4" />
+          Secrets
+        </h2>
+        <SecretsSection />
       </section>
 
       {/* Optio Agent Settings */}

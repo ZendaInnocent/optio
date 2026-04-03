@@ -3,18 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
-import {
-  Loader2,
-  Building2,
-  Users,
-  Trash2,
-  Shield,
-  Eye,
-  Edit3,
-  Save,
-  KeyRound,
-} from "lucide-react";
-import { SecretsSection } from "@/components/settings/secrets-section";
+import { Loader2, Building2, Users, Trash2, Shield, Eye, Edit3, Save } from "lucide-react";
 
 interface WorkspaceDetail {
   id: string;
@@ -530,15 +519,6 @@ export default function WorkspaceSettingsPage() {
       <section>
         <h2 className="text-sm font-medium text-text-muted mb-3">Default Image Configuration</h2>
         <WorkspaceImageConfig />
-      </section>
-
-      {/* Secrets */}
-      <section>
-        <h2 className="text-sm font-medium text-text-muted mb-3 flex items-center gap-2">
-          <KeyRound className="w-4 h-4" />
-          Secrets
-        </h2>
-        <SecretsSection />
       </section>
 
       {/* Danger Zone */}
