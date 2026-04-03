@@ -151,6 +151,84 @@ vi.mock("../services/workflow-service.js", () => ({
   checkWorkflowRunCompletion: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@optio/shared", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    renderPromptTemplate: vi.fn(() => "rendered prompt"),
+    renderTaskFile: vi.fn(() => "task file content"),
+    TASK_FILE_PATH: ".optio/task.md",
+    TASK_BRANCH_PREFIX: "optio/task-",
+  };
+});
+
+vi.mock("../lib/agent/prompt-loader.js", () => ({
+  promptLoader: {
+    buildPromptFile: vi.fn().mockResolvedValue({ path: "prompt.md", content: "prompt" }),
+  },
+}));
+
+vi.mock("@optio/shared", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    renderPromptTemplate: vi.fn(() => "rendered prompt"),
+    renderTaskFile: vi.fn(() => "task file content"),
+    TASK_FILE_PATH: ".optio/task.md",
+    TASK_BRANCH_PREFIX: "optio/task-",
+  };
+});
+
+vi.mock("../lib/agent/prompt-loader.js", () => ({
+  promptLoader: {
+    buildPromptFile: vi.fn().mockResolvedValue({ path: "prompt.md", content: "prompt" }),
+  },
+}));
+
+vi.mock("@optio/agent-adapters", () => ({
+  getAgentConfig: vi.fn(() => ({ requiredSecrets: [] })),
+  getAdapter: vi.fn(() => ({
+    buildContainerConfig: vi.fn(() => ({ image: "optio/agent:latest", setupFiles: [], env: {} })),
+    buildAgentCommand: vi.fn(() => ["echo", "test"]),
+    parseEvent: vi.fn((line: string) => {
+      if (line.includes('"session_id"')) {
+        const m = line.match(/"session_id":"([^"]+)"/);
+        return { sessionId: m?.[1], entries: [] };
+      }
+      return {
+        sessionId: undefined,
+        entries: [
+          { content: line, type: "text", taskId: "task-1", timestamp: new Date().toISOString() },
+        ],
+      };
+    }),
+    inferExitCode: vi.fn(() => 0),
+    parseResult: vi.fn(() => ({ summary: "Success", error: null })),
+  })),
+}));
+
+vi.mock("@optio/agent-adapters", () => ({
+  getAgentConfig: vi.fn(() => ({ requiredSecrets: [] })),
+  getAdapter: vi.fn(() => ({
+    buildContainerConfig: vi.fn(() => ({ image: "optio/agent:latest", setupFiles: [], env: {} })),
+    buildAgentCommand: vi.fn(() => ["echo", "test"]),
+    parseEvent: vi.fn((line: string) => {
+      if (line.includes('"session_id"')) {
+        const m = line.match(/"session_id":"([^"]+)"/);
+        return { sessionId: m?.[1], entries: [] };
+      }
+      return {
+        sessionId: undefined,
+        entries: [
+          { content: line, type: "text", taskId: "task-1", timestamp: new Date().toISOString() },
+        ],
+      };
+    }),
+    inferExitCode: vi.fn(() => 0),
+    parseResult: vi.fn(() => ({ summary: "Success", error: null })),
+  })),
+}));
+
 // ── Import mocked modules ──────────────────────────────────────────────────
 
 import * as dependencyService from "../services/dependency-service.js";
