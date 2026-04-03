@@ -260,6 +260,83 @@
       "when": 1776096000000,
       "tag": "0036_custom_images_and_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1776182400000,
+      "tag": "0037_agent_event_sourcing",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1776268800000,
+      "tag": "0038_add_agent_type_to_interactive_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1776355200000,
+      "tag": "0039_task_reflections",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1776441600000,
+      "tag": "0040_session_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1776528000000,
+      "tag": "0041_enabled_models_to_optio_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1776614400000,
+      "tag": "0042_add_workflow_type_to_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1776700800000,
+      "tag": "0043_add_model_to_interactive_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1776787200000,
+      "tag": "0044_notification_webhooks",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1776873600000,
+      "tag": "0045_interactive_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1776960000000,
+      "tag": "0046_task_comments_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1777046400000,
+      "tag": "0047_pod_resource_requests",
+      "breakpoints": true
     }
   ]
 }
