@@ -8,7 +8,11 @@ import { eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 import { parseClaudeEvent } from "../services/agent-event-parser.js";
 import { publishSessionEvent } from "../services/event-bus.js";
-import { addSessionMessage, trimSessionMessages } from "../services/interactive-session-service.js";
+import {
+  addSessionMessage,
+  trimSessionMessages,
+  getSessionMessages,
+} from "../services/interactive-session-service.js";
 import type { ExecSession, OptioSettings, AgentType } from "@optio/shared";
 import { authenticateWs, extractSessionToken } from "./ws-auth.js";
 import { getAdapter } from "@optio/agent-adapters";
@@ -112,7 +116,7 @@ export async function sessionChatWs(app: FastifyInstance) {
     const worktreePath = session.worktreePath ?? "/workspace/repo";
 
     let execSession: ExecSession | null = null;
-    let cumulativeCost = 0;
+    let cumulativeCost = session.costUsd ? parseFloat(session.costUsd) : 0;
     let isProcessing = false;
     let outputBuffer = "";
     let promptCount = 0;
@@ -360,6 +364,21 @@ export async function sessionChatWs(app: FastifyInstance) {
               send({ type: "error", message: `Unknown agent type: ${msg.agentType}` });
             }
           }
+          break;
+
+        case "resume_session":
+          getSessionMessages(sessionId, 100)
+            .then((messages) => {
+              send({
+                type: "session_restored",
+                messages,
+                costUsd: cumulativeCost,
+              });
+            })
+            .catch((err) => {
+              log.warn({ err }, "Failed to restore session messages");
+              send({ type: "error", message: "Failed to restore session" });
+            });
           break;
 
         default:

@@ -45,14 +45,24 @@ export interface CreateSessionInput {
 export type SessionChatClientMessage =
   | { type: "message"; content: string }
   | { type: "interrupt" }
-  | { type: "set_model"; model: string };
+  | { type: "set_model"; model: string }
+  | { type: "set_agent"; agentType: string }
+  | { type: "resume_session" };
 
 /** Server → Client message for the session chat WebSocket */
 export type SessionChatServerMessage =
   | { type: "chat_event"; event: SessionChatEvent }
   | { type: "cost_update"; costUsd: number }
-  | { type: "status"; status: SessionChatStatus; model?: string; costUsd?: number }
-  | { type: "error"; message: string };
+  | {
+      type: "status";
+      status: SessionChatStatus;
+      model?: string;
+      agentType?: string;
+      costUsd?: number;
+      settings?: Record<string, unknown>;
+    }
+  | { type: "error"; message: string }
+  | { type: "session_restored"; messages: SessionMessage[]; costUsd: number };
 
 export type SessionChatStatus = "ready" | "thinking" | "idle" | "error";
 

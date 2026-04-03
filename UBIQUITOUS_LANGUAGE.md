@@ -132,6 +132,15 @@
 | **Missing Column**     | A column that should exist in a table but doesn't (causes insert failures)                     | Column not found          |
 | **Health Check**       | An API endpoint that verifies system readiness (database, container runtime, schema integrity) | Status check, ping        |
 
+## Session Resume
+
+| Term                 | Definition                                                                                                  | Aliases to avoid           |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------- |
+| **Session Resume**   | The process of restoring a previous conversation state when a client reconnects to an active session        | Reconnect, session restore |
+| **resume_session**   | A client→server WebSocket message type that triggers session history retrieval                              | Resume message             |
+| **session_restored** | A server→client WebSocket message containing restored messages and cumulative cost                          | Restored state, catch-up   |
+| **Cumulative Cost**  | The total `costUsd` accumulated across all prompts in a session, restored from the session record on resume | Total cost, session cost   |
+
 ## Flagged Ambiguities
 
 - **"OpenCode" vs "opencode-ai"**: The npm package is `opencode-ai` but the CLI command is `opencode`. We standardize on "OpenCode" (the product) and "OpenCode CLI" (the command). Avoid referring to the package in conversation.

@@ -81,6 +81,7 @@ export function SessionChat({ sessionId, onCostUpdate, onSendToAgent }: SessionC
 
     ws.onopen = () => {
       setStatus("ready");
+      ws.send(JSON.stringify({ type: "resume_session" }));
     };
 
     ws.onmessage = (event) => {
@@ -100,6 +101,23 @@ export function SessionChat({ sessionId, onCostUpdate, onSendToAgent }: SessionC
             onCostUpdate?.(msg.costUsd);
           }
           break;
+
+        case "session_restored": {
+          const restoredMessages: ChatMessage[] = (msg.messages || []).map((m: any) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            timestamp: m.timestamp,
+            events: [],
+          }));
+          setMessages(restoredMessages);
+          if (typeof msg.costUsd === "number") {
+            setCostUsd(msg.costUsd);
+            onCostUpdate?.(msg.costUsd);
+          }
+          setTimeout(scrollToBottom, 50);
+          break;
+        }
 
         case "chat_event": {
           const chatEvent = msg.event as ChatEvent;
