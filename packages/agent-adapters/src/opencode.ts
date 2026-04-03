@@ -67,21 +67,7 @@ export class OpencodeAdapter implements AgentAdapter {
     const requiredSecrets: string[] = ["GITHUB_TOKEN"];
     const setupFiles: AgentContainerConfig["setupFiles"] = [];
 
-    // Determine which AI auth secret is required based on the model
     const model = input.opencodeModel;
-    if (model) {
-      if (model.startsWith("anthropic/") || model.includes("claude")) {
-        requiredSecrets.push("ANTHROPIC_API_KEY");
-      } else if (model.startsWith("openai/") || model.includes("gpt") || model.includes("o4")) {
-        requiredSecrets.push("OPENAI_API_KEY");
-      } else {
-        // Unknown provider or custom model — require OpenCode API key
-        requiredSecrets.push("OPENCODE_API_KEY");
-      }
-    } else {
-      // No model specified — require OpenCode API key as fallback
-      requiredSecrets.push("OPENCODE_API_KEY");
-    }
 
     // Write the task file into the worktree
     if (input.taskFileContent && input.taskFilePath) {

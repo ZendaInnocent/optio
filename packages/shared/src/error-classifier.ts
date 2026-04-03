@@ -60,9 +60,10 @@ const ERROR_PATTERNS: Array<{
     classify: () => ({
       category: "auth",
       title: "Anthropic API key missing",
-      description: "No Anthropic API key is configured and Claude Code cannot authenticate.",
+      description:
+        "No Anthropic API key is configured. Some models require this API key to authenticate.",
       remedy:
-        "Go to Secrets and add ANTHROPIC_API_KEY, or switch to Max subscription auth in Settings.",
+        "Go to Secrets and add ANTHROPIC_API_KEY, or use a model that doesn't require an Anthropic API key (e.g., OpenAI models).",
       retryable: true,
     }),
   },
@@ -134,17 +135,6 @@ const ERROR_PATTERNS: Array<{
     }),
   },
   {
-    pattern: /OOMKilled|out of memory/i,
-    classify: () => ({
-      category: "resource",
-      title: "Out of memory",
-      description: "The agent container was killed because it exceeded its memory limit.",
-      remedy:
-        "Increase the memory limit in the repo's container settings, or use a larger image preset.",
-      retryable: true,
-    }),
-  },
-  {
     pattern: /rate.?limit|429|too many requests/i,
     classify: () => ({
       category: "auth",
@@ -165,6 +155,17 @@ const ERROR_PATTERNS: Array<{
         "The agent could not connect to a required service. This could be the GitHub API, Anthropic API, or an internal service.",
       remedy:
         "Check that port-forwards are running (kubectl port-forward) and external APIs are reachable.",
+      retryable: true,
+    }),
+  },
+  {
+    pattern: /OOMKilled|out of memory/i,
+    classify: () => ({
+      category: "resource",
+      title: "Out of memory",
+      description: "The agent container was killed because it exceeded its memory limit.",
+      remedy:
+        "Increase the memory limit in the repo's container settings, or use a larger image preset.",
       retryable: true,
     }),
   },
