@@ -108,8 +108,12 @@ export async function sessionChatWs(app: FastifyInstance) {
       return;
     }
 
-    // Optio settings take precedence, then repo config, then default
-    let currentModel = optioSettings.model || repoConfig?.claudeModel || "sonnet";
+    // Optio settings take precedence, then session override, then repo config, then default
+    let currentModel =
+      optioSettings.model ||
+      session.model ||
+      repoConfig?.claudeModel ||
+      (currentAgentType === "opencode" ? "opencode/big-pickle" : "sonnet");
 
     const rt = getRuntime();
     const handle = { id: pod.podId ?? pod.podName, name: pod.podName };

@@ -20,6 +20,7 @@ import {
   DollarSign,
   ChevronDown,
   Bot,
+  Cpu,
 } from "lucide-react";
 import { SessionTerminal } from "@/components/session-terminal";
 import { SessionChat } from "@/components/session-chat";
@@ -30,8 +31,8 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const [session, setSession] = useState<any>(null);
   const [modelConfig, setModelConfig] = useState<{
-    claudeModel: string;
-    availableModels: string[];
+    currentModel: string | null;
+    availableModels: Array<{ id: string; name: string; provider: string; isFree: boolean }>;
   } | null>(null);
   const [prs, setPrs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,9 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
   const [liveCost, setLiveCost] = useState<number>(0);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<string>("opencode");
+  const wsSendRef = useRef<((msg: any) => void) | null>(null);
 
   // Ref for "send to agent" handler
   const sendToAgentRef = useRef<((text: string) => void) | null>(null);
@@ -48,10 +52,18 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
     try {
       const [sessionRes, prsRes] = await Promise.all([api.getSession(id), api.getSessionPrs(id)]);
       setSession(sessionRes.session);
+      // Set agent from session or default
+      if (sessionRes.session.agentType) {
+        setSelectedAgent(sessionRes.session.agentType);
+      }
       if ((sessionRes as any).modelConfig) {
-        setModelConfig((sessionRes as any).modelConfig);
-        if (!selectedModel) {
-          setSelectedModel((sessionRes as any).modelConfig.claudeModel ?? "sonnet");
+        const mc = (sessionRes as any).modelConfig;
+        setModelConfig(mc);
+        // Set initial selected model to session's model or first available
+        if (mc.currentModel) {
+          setSelectedModel(mc.currentModel);
+        } else if (mc.availableModels.length > 0) {
+          setSelectedModel(mc.availableModels[0].id);
         }
       }
       setPrs(prsRes.prs);
@@ -101,6 +113,10 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
 
   const handleSendToAgentRegister = useCallback((handler: (text: string) => void) => {
     sendToAgentRef.current = handler;
+  }, []);
+
+  const handleWsMessageReady = useCallback((send: (msg: any) => void) => {
+    wsSendRef.current = send;
   }, []);
 
   if (loading) {
@@ -184,7 +200,18 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-bg-card border border-border text-text-muted hover:text-text transition-colors"
                 >
                   <Bot className="w-3 h-3" />
-                  {selectedModel}
+                  {selectedModel ? (
+                    <span className="flex items-center gap-1">
+                      {(() => {
+                        const m = modelConfig.availableModels.find(
+                          (m: any) => m.id === selectedModel,
+                        );
+                        return m ? m.name : selectedModel;
+                      })()}
+                    </span>
+                  ) : (
+                    "Select model"
+                  )}
                   <ChevronDown className="w-3 h-3" />
                 </button>
                 {showModelDropdown && (
@@ -193,20 +220,80 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
                       className="fixed inset-0 z-40"
                       onClick={() => setShowModelDropdown(false)}
                     />
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-bg-card border border-border rounded-lg shadow-lg py-1 min-w-[120px]">
-                      {modelConfig.availableModels.map((m) => (
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px]">
+                      {modelConfig.availableModels.map((m: any) => (
                         <button
-                          key={m}
+                          key={m.id}
                           onClick={() => {
-                            setSelectedModel(m);
+                            setSelectedModel(m.id);
                             setShowModelDropdown(false);
+                            // Send set_model message to agent
+                            if (wsSendRef.current) {
+                              wsSendRef.current({ type: "set_model", model: m.id });
+                            }
+                          }}
+                          className={cn(
+                            "w-full text-left px-3 py-1.5 text-xs hover:bg-bg transition-colors flex items-center justify-between",
+                            m.id === selectedModel && "text-primary font-medium",
+                          )}
+                        >
+                          <span>{m.name}</span>
+                          {m.isFree ? (
+                            <span className="px-1 py-0.5 text-[10px] rounded-full bg-success/20 text-success">
+                              Free
+                            </span>
+                          ) : (
+                            <span className="px-1 py-0.5 text-[10px] rounded-full bg-primary/20 text-primary">
+                              Paid
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Agent selector */}
+            {isActive && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowAgentDropdown(!showAgentDropdown)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-bg-card border border-border text-text-muted hover:text-text transition-colors"
+                >
+                  <Cpu className="w-3 h-3" />
+                  {selectedAgent}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showAgentDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowAgentDropdown(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-bg-card border border-border rounded-lg shadow-lg py-1 min-w-[140px]">
+                      {[
+                        { value: "claude-code", label: "Claude Code" },
+                        { value: "codex", label: "OpenAI Codex" },
+                        { value: "opencode", label: "OpenCode AI" },
+                      ].map((agent) => (
+                        <button
+                          key={agent.value}
+                          onClick={() => {
+                            setSelectedAgent(agent.value);
+                            setShowAgentDropdown(false);
+                            // Send set_agent message to agent
+                            if (wsSendRef.current) {
+                              wsSendRef.current({ type: "set_agent", agentType: agent.value });
+                            }
                           }}
                           className={cn(
                             "w-full text-left px-3 py-1.5 text-xs hover:bg-bg transition-colors",
-                            m === selectedModel && "text-primary font-medium",
+                            agent.value === selectedAgent && "text-primary font-medium",
                           )}
                         >
-                          {m}
+                          {agent.label}
                         </button>
                       ))}
                     </div>
@@ -282,6 +369,7 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
                   sessionId={id}
                   onCostUpdate={handleCostUpdate}
                   onSendToAgent={handleSendToAgentRegister}
+                  onWsMessageReady={handleWsMessageReady}
                 />
               </ErrorBoundary>
             }

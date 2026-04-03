@@ -5,8 +5,10 @@ import type { FastifyInstance } from "fastify";
 // ─── Mocks ───
 
 const mockRetrieveSecret = vi.fn();
+const mockRetrieveSecretWithFallback = vi.fn();
 vi.mock("../services/secret-service.js", () => ({
   retrieveSecret: (...args: unknown[]) => mockRetrieveSecret(...args),
+  retrieveSecretWithFallback: (...args: unknown[]) => mockRetrieveSecretWithFallback(...args),
 }));
 
 const mockDbSelect = vi.fn();
@@ -57,6 +59,10 @@ async function buildTestApp(): Promise<FastifyInstance> {
     done();
   });
   await issueRoutes(app);
+  // Set global error handler to match server behavior
+  app.setErrorHandler((_error, _req, reply) => {
+    reply.status(500).send({ error: "Internal server error" });
+  });
   await app.ready();
   return app;
 }
@@ -74,7 +80,7 @@ describe("GET /api/issues", () => {
   });
 
   it("returns 503 when no GitHub token is configured", async () => {
-    mockRetrieveSecret.mockRejectedValue(new Error("not found"));
+    mockRetrieveSecretWithFallback.mockRejectedValue(new Error("not found"));
 
     const res = await app.inject({ method: "GET", url: "/api/issues" });
 
@@ -83,7 +89,7 @@ describe("GET /api/issues", () => {
   });
 
   it("returns empty issues when no repos are configured", async () => {
-    mockRetrieveSecret.mockResolvedValue("ghp_token");
+    mockRetrieveSecretWithFallback.mockResolvedValue("ghp_token");
 
     // repos query returns empty
     const repoChain = {
@@ -151,7 +157,7 @@ describe("POST /api/issues/assign", () => {
       ]),
     };
     mockDbSelect.mockReturnValue(chainable);
-    mockRetrieveSecret.mockRejectedValue(new Error("not found"));
+    mockRetrieveSecretWithFallback.mockRejectedValue(new Error("not found"));
 
     const res = await app.inject({
       method: "POST",
@@ -193,5 +199,65 @@ describe("POST /api/issues/assign", () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+
+  it("returns 500 and marks task as FAILED when taskQueue.add fails", async () => {
+    // Repo exists
+    const chainable = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue([
+        {
+          id: "repo-1",
+          repoUrl: "https://github.com/org/repo",
+          workspaceId: "ws-1",
+        },
+      ]),
+    };
+    mockDbSelect.mockReturnValue(chainable);
+    mockRetrieveSecretWithFallback.mockResolvedValue("ghp_token");
+
+    // Mock createTask to return a task
+    mockCreateTask.mockResolvedValue({
+      id: "task-1",
+      priority: 100,
+      maxRetries: 3,
+    });
+
+    // Simulate queue add failure
+    const queueError = new Error("Redis connection error");
+    mockQueueAdd.mockRejectedValue(queueError);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/issues/assign",
+      payload: {
+        issueNumber: 42,
+        repoId: "repo-1",
+        title: "Fix bug",
+        body: "Bug description",
+      },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error).toBe("Internal server error");
+
+    // Verify task creation and transition to QUEUED
+    expect(mockCreateTask).toHaveBeenCalledTimes(1);
+    expect(mockTransitionTask).toHaveBeenCalledTimes(2);
+    // First transition to QUEUED
+    expect(mockTransitionTask).toHaveBeenNthCalledWith(
+      1,
+      "task-1",
+      expect.anything(),
+      "issue_assigned",
+    );
+    // Second transition to FAILED after queue error
+    expect(mockTransitionTask).toHaveBeenNthCalledWith(
+      2,
+      "task-1",
+      "failed",
+      "queue_failure",
+      expect.anything(),
+    );
   });
 });

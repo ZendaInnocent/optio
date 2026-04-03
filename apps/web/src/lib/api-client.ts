@@ -571,7 +571,7 @@ export const api = {
 
   getSession: (id: string) => request<{ session: any }>(`/api/sessions/${id}`),
 
-  createSession: (data: { repoUrl: string }) =>
+  createSession: (data: { repoUrl: string; agentType?: string; model?: string }) =>
     request<{ session: any }>("/api/sessions", {
       method: "POST",
       body: JSON.stringify(data),

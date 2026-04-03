@@ -214,16 +214,36 @@ export async function issueRoutes(app: FastifyInstance) {
     });
 
     await taskServiceModule.transitionTask(task.id, TaskState.QUEUED, "issue_assigned");
-    await taskQueue.add(
-      "process-task",
-      { taskId: task.id },
-      {
-        jobId: task.id,
-        priority: task.priority ?? 100,
-        attempts: task.maxRetries + 1,
-        backoff: { type: "exponential", delay: 5000 },
-      },
-    );
+    try {
+      await taskQueue.add(
+        "process-task",
+        { taskId: task.id },
+        {
+          jobId: task.id,
+          priority: task.priority ?? 100,
+          attempts: task.maxRetries + 1,
+          backoff: { type: "exponential", delay: 5000 },
+        },
+      );
+    } catch (err) {
+      logger.error({ err, taskId: task.id }, "Failed to enqueue task");
+      // Mark task as FAILED to avoid leaving it in QUEUED state without a queue job
+      try {
+        await taskServiceModule.transitionTask(
+          task.id,
+          TaskState.FAILED,
+          "queue_failure",
+          String(err),
+        );
+      } catch (transitionErr) {
+        logger.error(
+          { transitionErr, taskId: task.id },
+          "Failed to transition task to FAILED after queue error",
+        );
+      }
+      // Re-throw to return 500 to client
+      throw err;
+    }
 
     // Comment on the issue
     try {

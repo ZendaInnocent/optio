@@ -410,6 +410,7 @@ export const interactiveSessions = pgTable(
     state: interactiveSessionStateEnum("state").notNull().default("active"),
     podId: uuid("pod_id"),
     agentType: text("agent_type"),
+    model: text("model"), // Selected AI model for this session
     costUsd: text("cost_usd"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

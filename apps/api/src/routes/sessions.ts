@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import * as sessionService from "../services/interactive-session-service.js";
+import { getAvailableModels } from "../services/model-catalog-service.js";
 import { db } from "../db/client.js";
 import { repos } from "../db/schema.js";
 
@@ -14,6 +15,8 @@ const listSessionsQuerySchema = z.object({
 
 const createSessionSchema = z.object({
   repoUrl: z.string().url(),
+  agentType: z.enum(["claude-code", "codex", "opencode"]).optional(),
+  model: z.string().optional(),
 });
 
 export async function sessionRoutes(app: FastifyInstance) {
@@ -40,19 +43,18 @@ export async function sessionRoutes(app: FastifyInstance) {
     const session = await sessionService.getSession(id);
     if (!session) return reply.status(404).send({ error: "Session not found" });
 
-    // Attach repo model config
-    let modelConfig: { claudeModel: string; availableModels: string[] } | null = null;
-    try {
-      const [repoConfig] = await db.select().from(repos).where(eq(repos.repoUrl, session.repoUrl));
-      modelConfig = {
-        claudeModel: repoConfig?.claudeModel ?? "sonnet",
-        availableModels: ["haiku", "sonnet", "opus"],
-      };
-    } catch {
-      // Non-critical
-    }
+    // Get available models for the user (free + paid based on API keys)
+    const userId = req.user?.id ?? null;
+    const availableModels = await getAvailableModels(userId);
 
-    reply.send({ session, modelConfig });
+    // Return session with model config
+    reply.send({
+      session,
+      modelConfig: {
+        currentModel: session.model ?? null,
+        availableModels,
+      },
+    });
   });
 
   // Create session
@@ -62,6 +64,8 @@ export async function sessionRoutes(app: FastifyInstance) {
     const session = await sessionService.createSession({
       repoUrl: input.repoUrl,
       userId,
+      agentType: input.agentType,
+      model: input.model,
     });
     reply.status(201).send({ session });
   });

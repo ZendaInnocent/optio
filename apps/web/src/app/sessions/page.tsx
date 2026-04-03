@@ -5,7 +5,8 @@ import { api } from "@/lib/api-client";
 import { toast } from "sonner";
 import Link from "next/link";
 import { cn, formatRelativeTime, formatDuration } from "@/lib/utils";
-import { Plus, Terminal, Loader2, FolderGit2, CircleDot, StopCircle } from "lucide-react";
+import { Plus, Terminal, Loader2, FolderGit2, CircleDot, StopCircle, X } from "lucide-react";
+import { AgentSelector, ModelSelector } from "@/components/agent-model-selector";
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -15,6 +16,9 @@ export default function SessionsPage() {
   const [repos, setRepos] = useState<any[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newSessionAgent, setNewSessionAgent] = useState("opencode");
+  const [newSessionModel, setNewSessionModel] = useState<string>("");
 
   useEffect(() => {
     api
@@ -43,20 +47,31 @@ export default function SessionsPage() {
       toast.error("Add a repo first");
       return;
     }
+    // Open modal to configure agent and model
+    setShowCreateModal(true);
+  };
+
+  const handleConfirmCreate = async () => {
     const repoUrl = selectedRepo || repos[0]?.repoUrl;
     if (!repoUrl) return;
     setCreating(true);
     try {
-      const res = await api.createSession({ repoUrl });
+      const res = await api.createSession({
+        repoUrl,
+        agentType: newSessionAgent,
+        model: newSessionModel || undefined,
+      });
       toast.success("Session created");
       setSessions((prev) => [res.session, ...prev]);
       setActiveCount((c) => c + 1);
+      setShowCreateModal(false);
       // Navigate to the new session
       window.location.href = `/sessions/${res.session.id}`;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create session");
+    } finally {
+      setCreating(false);
     }
-    setCreating(false);
   };
 
   return (
@@ -117,6 +132,59 @@ export default function SessionsPage() {
           </button>
         ))}
       </div>
+      {/* Create Session Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-bg-card border border-border rounded-xl p-6 max-w-lg mx-4 shadow-xl w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm">New Session Configuration</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-text-muted hover:text-text transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-xs text-text-muted">
+                Configure the agent and model for this interactive session.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <AgentSelector
+                  value={newSessionAgent}
+                  onChange={(agent) => setNewSessionAgent(agent)}
+                />
+                <div className="relative">
+                  <ModelSelector
+                    value={newSessionModel}
+                    onChange={(model) => setNewSessionModel(model)}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-6 justify-end">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 rounded-lg text-xs font-medium bg-bg border border-border text-text-muted hover:text-text transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmCreate}
+                disabled={creating}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+              >
+                {creating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                Create Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-text-muted">

@@ -24,7 +24,7 @@ const CORE_TABLES = [
   "tasks",
 ];
 
-const TABLE_COLUMNS: Record<string, string[]> = {
+export const TABLE_COLUMNS: Record<string, string[]> = {
   interactive_sessions: [
     "id",
     "repo_url",
@@ -34,6 +34,7 @@ const TABLE_COLUMNS: Record<string, string[]> = {
     "state",
     "pod_id",
     "agent_type",
+    "model",
     "cost_usd",
     "created_at",
     "updated_at",
@@ -63,6 +64,66 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   ],
   workspaces: ["id", "slug", "name", "created_at"],
   users: ["id", "provider", "external_id", "email", "display_name"],
+  tasks: [
+    "id",
+    "title",
+    "prompt",
+    "repo_url",
+    "repo_branch",
+    "state",
+    "agent_type",
+    "container_id",
+    "session_id",
+    "pr_url",
+    "pr_number",
+    "pr_state",
+    "pr_checks_status",
+    "pr_review_status",
+    "pr_review_comments",
+    "result_summary",
+    "cost_usd",
+    "input_tokens",
+    "output_tokens",
+    "model_used",
+    "error_message",
+    "ticket_source",
+    "ticket_external_id",
+    "metadata",
+    "retry_count",
+    "max_retries",
+    "priority",
+    "parent_task_id",
+    "task_type",
+    "workflow_type",
+    "subtask_order",
+    "blocks_parent",
+    "worktree_state",
+    "last_pod_id",
+    "workflow_run_id",
+    "created_by",
+    "ignore_off_peak",
+    "workspace_id",
+    "created_at",
+    "updated_at",
+    "started_at",
+    "completed_at",
+  ],
+  workspace_members: ["id", "workspace_id", "user_id", "role", "can_build", "created_at"],
+  repo_pods: [
+    "id",
+    "repo_url",
+    "workspace_id",
+    "repo_branch",
+    "instance_index",
+    "pod_name",
+    "pod_id",
+    "state",
+    "active_task_count",
+    "last_task_at",
+    "error_message",
+    "created_at",
+    "updated_at",
+  ],
 };
 
 export async function validateSchema(): Promise<SchemaValidationResult> {
@@ -100,7 +161,7 @@ export async function validateSchema(): Promise<SchemaValidationResult> {
   };
 }
 
-async function checkTableExists(tableName: string): Promise<boolean> {
+export async function checkTableExists(tableName: string): Promise<boolean> {
   try {
     const result = await db.execute<{ exists: boolean }>(
       sql`SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ${tableName}) as exists`,
@@ -111,7 +172,7 @@ async function checkTableExists(tableName: string): Promise<boolean> {
   }
 }
 
-async function checkColumnExists(tableName: string, columnName: string): Promise<boolean> {
+export async function checkColumnExists(tableName: string, columnName: string): Promise<boolean> {
   try {
     const result = await db.execute<{ exists: boolean }>(
       sql`SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${columnName}) as exists`,

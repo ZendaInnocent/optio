@@ -45,9 +45,15 @@ interface SessionChatProps {
   sessionId: string;
   onCostUpdate?: (costUsd: number) => void;
   onSendToAgent?: (handler: (text: string) => void) => void;
+  onWsMessageReady?: (send: (msg: any) => void) => void;
 }
 
-export function SessionChat({ sessionId, onCostUpdate, onSendToAgent }: SessionChatProps) {
+export function SessionChat({
+  sessionId,
+  onCostUpdate,
+  onSendToAgent,
+  onWsMessageReady,
+}: SessionChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<ChatStatus>("connecting");
@@ -82,6 +88,8 @@ export function SessionChat({ sessionId, onCostUpdate, onSendToAgent }: SessionC
     ws.onopen = () => {
       setStatus("ready");
       ws.send(JSON.stringify({ type: "resume_session" }));
+      // Expose send function to parent
+      onWsMessageReady?.(ws.send.bind(ws));
     };
 
     ws.onmessage = (event) => {

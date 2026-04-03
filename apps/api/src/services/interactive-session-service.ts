@@ -11,6 +11,7 @@ export async function createSession(input: {
   repoUrl: string;
   userId?: string;
   agentType?: string;
+  model?: string;
 }) {
   const repoUrl = normalizeRepoUrl(input.repoUrl);
 
@@ -66,6 +67,7 @@ export async function createSession(input: {
       state: "active",
       podId: pod.id,
       agentType: input.agentType ?? null,
+      model: input.model ?? null,
     })
     .returning();
 

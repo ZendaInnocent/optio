@@ -13,6 +13,7 @@ const mockAddSessionPr = vi.fn();
 const mockGetActiveSessionCount = vi.fn();
 const mockGetSessionMessages = vi.fn();
 const mockAddSessionMessage = vi.fn();
+const mockGetAvailableModels = vi.fn();
 
 vi.mock("../services/interactive-session-service.js", () => ({
   listSessions: (...args: unknown[]) => mockListSessions(...args),
@@ -24,6 +25,10 @@ vi.mock("../services/interactive-session-service.js", () => ({
   getActiveSessionCount: (...args: unknown[]) => mockGetActiveSessionCount(...args),
   getSessionMessages: (...args: unknown[]) => mockGetSessionMessages(...args),
   addSessionMessage: (...args: unknown[]) => mockAddSessionMessage(...args),
+}));
+
+vi.mock("../services/model-catalog-service.js", () => ({
+  getAvailableModels: (...args: unknown[]) => mockGetAvailableModels(...args),
 }));
 
 const mockDbSelect = vi.fn();
@@ -48,10 +53,8 @@ import { sessionRoutes } from "./sessions.js";
 async function buildTestApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   app.decorateRequest("user", undefined as any);
-  app.decorateRequest("userId", undefined as any);
   app.addHook("preHandler", (req, _reply, done) => {
-    (req as any).user = { workspaceId: "ws-1" };
-    (req as any).userId = "user-1";
+    (req as any).user = { id: "user-1", workspaceId: "ws-1" };
     done();
   });
   await sessionRoutes(app);
@@ -71,6 +74,10 @@ describe("GET /api/sessions", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Default mock for getAvailableModels - returns free models
+    mockGetAvailableModels.mockResolvedValue([
+      { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
+    ]);
     app = await buildTestApp();
   });
 
@@ -121,7 +128,7 @@ describe("GET /api/sessions/:id", () => {
 
   it("returns session with model config", async () => {
     mockGetSession.mockResolvedValue(mockSession);
-    mockDbSelect.mockResolvedValue([{ claudeModel: "opus" }]);
+    // mockGetAvailableModels already returns free models
 
     const res = await app.inject({ method: "GET", url: "/api/sessions/session-1" });
 
@@ -129,8 +136,10 @@ describe("GET /api/sessions/:id", () => {
     const body = res.json();
     expect(body.session).toEqual(mockSession);
     expect(body.modelConfig).toEqual({
-      claudeModel: "opus",
-      availableModels: ["haiku", "sonnet", "opus"],
+      currentModel: null,
+      availableModels: [
+        { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
+      ],
     });
   });
 
@@ -150,7 +159,13 @@ describe("GET /api/sessions/:id", () => {
     const res = await app.inject({ method: "GET", url: "/api/sessions/session-1" });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json().modelConfig).toBeNull();
+    const body = res.json();
+    expect(body.modelConfig).toEqual({
+      currentModel: null,
+      availableModels: [
+        { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
+      ],
+    });
   });
 });
 
@@ -176,6 +191,30 @@ describe("POST /api/sessions", () => {
     expect(mockCreateSession).toHaveBeenCalledWith({
       repoUrl: "https://github.com/org/repo",
       userId: "user-1",
+      agentType: undefined,
+      model: undefined,
+    });
+  });
+
+  it("creates a session with agentType and model", async () => {
+    mockCreateSession.mockResolvedValue(mockSession);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: {
+        repoUrl: "https://github.com/org/repo",
+        agentType: "opencode",
+        model: "opencode/big-pickle",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      repoUrl: "https://github.com/org/repo",
+      userId: "user-1",
+      agentType: "opencode",
+      model: "opencode/big-pickle",
     });
   });
 
@@ -409,7 +448,7 @@ describe("POST /api/sessions/:id/messages", () => {
       payload: { role: "invalid", content: "hello" },
     });
 
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(400);
   });
 
   it("rejects empty content", async () => {
@@ -421,6 +460,6 @@ describe("POST /api/sessions/:id/messages", () => {
       payload: { role: "user", content: "" },
     });
 
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(400);
   });
 });
