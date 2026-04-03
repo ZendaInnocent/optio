@@ -31,6 +31,8 @@ export function useLogs(taskId: string) {
     clientRef.current = client;
 
     client.on("task:log", (event) => {
+      if (event.catchUp) return;
+
       const entry: LogEntry = {
         content: event.content,
         stream: event.stream,
@@ -42,7 +44,6 @@ export function useLogs(taskId: string) {
         pendingLive.push(entry);
       } else {
         setLogs((prev) => {
-          // Dedup: skip if the last entry has identical content and type
           const last = prev[prev.length - 1];
           if (
             last &&
