@@ -89,3 +89,20 @@ If `use_subagent_orchestration` is `false`:
 - [ ] Browser tests pass (if UI feature)
 - [ ] No console errors in browser
 - [ ] Subagent verification complete (if enabled)
+
+## TDD Quality Check
+
+Run TDD compliance check to ensure tests follow best practices:
+
+```bash
+node scripts/run-silent.js "tdd-check" "node scripts/check-tdd.js apps/api/src"
+```
+
+Checks:
+
+- No mocks of internal modules (only external APIs)
+- No assertions on call counts/order
+- No direct DB queries (use public interfaces)
+- No tests for private methods
+
+If violations found, fix the tests before proceeding. See `agent_docs/tdd-tests.md` for examples.

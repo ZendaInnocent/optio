@@ -17,6 +17,19 @@ Read before working on related tasks:
 - `agent_docs/database-schema.md` — DB schemas, state machine
 - `agent_docs/architecture.md` — System architecture
 
+## Test-Driven Development
+
+When implementing features or fixing bugs, follow TDD principles:
+
+- `agent_docs/tdd.md` — Philosophy, workflow, vertical slices
+- `agent_docs/tdd-tests.md` — Good vs bad tests, behavior vs implementation
+- `agent_docs/tdd-mocking.md` — When to mock (boundaries only)
+- `agent_docs/tdd-deep-modules.md` — Small interfaces, deep implementation
+- `agent_docs/tdd-interface.md` — Designing for testability
+- `agent_docs/tdd-refactoring.md` — Refactor candidates after green
+
+**Key**: One test → one implementation → repeat. Tests verify behavior through public interfaces, not implementation details.
+
 ## Verification
 
 Run before committing:

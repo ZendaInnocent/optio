@@ -53,3 +53,13 @@ These rules are **always enforced** - they cannot be disabled via config.
 
 **Rule:** Always link commits to issues.
 **Why:** Traceability. Understanding context later.
+
+### 11. Testing implementation details
+
+**Rule:** Tests must verify behavior through public interfaces, not implementation.
+**Why:** Implementation-coupled tests break on refactor. Tests should describe what the system does, not how.
+
+### 12. Mocking internal modules
+
+**Rule:** Mock only at system boundaries (external APIs, databases, time).
+**Why:** Mocking your own code hides bugs and couples tests to implementation.
