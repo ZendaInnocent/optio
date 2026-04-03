@@ -29,6 +29,14 @@ export interface SessionPr {
   updatedAt: string;
 }
 
+export interface SessionMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
 export interface CreateSessionInput {
   repoUrl: string;
 }

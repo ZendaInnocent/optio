@@ -439,6 +439,23 @@ export const sessionPrs = pgTable(
   (table) => [index("session_prs_session_id_idx").on(table.sessionId)],
 );
 
+export const sessionMessages = pgTable(
+  "session_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interactiveSessions.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // "user" | "assistant"
+    content: text("content").notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("session_messages_session_id_idx").on(table.sessionId),
+    index("session_messages_timestamp_idx").on(table.timestamp),
+  ],
+);
+
 export const schedules = pgTable(
   "schedules",
   {

@@ -101,4 +101,40 @@ export async function sessionRoutes(app: FastifyInstance) {
     const count = await sessionService.getActiveSessionCount(repoUrl);
     reply.send({ count });
   });
+
+  // Get session messages (last 100 by default)
+  app.get("/api/sessions/:id/messages", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const session = await sessionService.getSession(id);
+    if (!session) return reply.status(404).send({ error: "Session not found" });
+
+    const queryLimit = req.query as { limit?: string };
+    const limit = queryLimit.limit ? Math.min(parseInt(queryLimit.limit, 10), 1000) : 100;
+
+    const messages = await sessionService.getSessionMessages(id, limit);
+    reply.send({ messages });
+  });
+
+  // Add a message to a session (for resumability / manual injection)
+  app.post("/api/sessions/:id/messages", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const session = await sessionService.getSession(id);
+    if (!session) return reply.status(404).send({ error: "Session not found" });
+
+    const bodySchema = z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string().min(1),
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0].message });
+    }
+
+    const message = await sessionService.addSessionMessage(
+      id,
+      parsed.data.role,
+      parsed.data.content,
+    );
+    reply.status(201).send({ message });
+  });
 }

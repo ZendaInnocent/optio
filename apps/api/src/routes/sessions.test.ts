@@ -11,6 +11,8 @@ const mockEndSession = vi.fn();
 const mockGetSessionPrs = vi.fn();
 const mockAddSessionPr = vi.fn();
 const mockGetActiveSessionCount = vi.fn();
+const mockGetSessionMessages = vi.fn();
+const mockAddSessionMessage = vi.fn();
 
 vi.mock("../services/interactive-session-service.js", () => ({
   listSessions: (...args: unknown[]) => mockListSessions(...args),
@@ -20,6 +22,8 @@ vi.mock("../services/interactive-session-service.js", () => ({
   getSessionPrs: (...args: unknown[]) => mockGetSessionPrs(...args),
   addSessionPr: (...args: unknown[]) => mockAddSessionPr(...args),
   getActiveSessionCount: (...args: unknown[]) => mockGetActiveSessionCount(...args),
+  getSessionMessages: (...args: unknown[]) => mockGetSessionMessages(...args),
+  addSessionMessage: (...args: unknown[]) => mockAddSessionMessage(...args),
 }));
 
 const mockDbSelect = vi.fn();
@@ -281,5 +285,142 @@ describe("GET /api/sessions/active-count", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().count).toBe(3);
+  });
+});
+
+describe("GET /api/sessions/:id/messages", () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    app = await buildTestApp();
+  });
+
+  it("returns messages for a session", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+    mockGetSessionMessages.mockResolvedValue([
+      { id: "msg-1", role: "user", content: "hello", timestamp: "2024-01-01T00:00:00Z" },
+      { id: "msg-2", role: "assistant", content: "hi", timestamp: "2024-01-01T00:01:00Z" },
+    ]);
+
+    const res = await app.inject({ method: "GET", url: "/api/sessions/session-1/messages" });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe("user");
+    expect(body.messages[1].role).toBe("assistant");
+  });
+
+  it("returns 404 for nonexistent session", async () => {
+    mockGetSession.mockResolvedValue(null);
+
+    const res = await app.inject({ method: "GET", url: "/api/sessions/nonexistent/messages" });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe("Session not found");
+  });
+
+  it("passes custom limit parameter", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+    mockGetSessionMessages.mockResolvedValue([]);
+
+    await app.inject({ method: "GET", url: "/api/sessions/session-1/messages?limit=50" });
+
+    expect(mockGetSessionMessages).toHaveBeenCalledWith("session-1", 50);
+  });
+
+  it("caps limit at 1000", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+    mockGetSessionMessages.mockResolvedValue([]);
+
+    await app.inject({ method: "GET", url: "/api/sessions/session-1/messages?limit=9999" });
+
+    expect(mockGetSessionMessages).toHaveBeenCalledWith("session-1", 1000);
+  });
+});
+
+describe("POST /api/sessions/:id/messages", () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    app = await buildTestApp();
+  });
+
+  it("adds a user message to a session", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+    mockAddSessionMessage.mockResolvedValue({
+      id: "msg-1",
+      sessionId: "session-1",
+      role: "user",
+      content: "hello",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sessions/session-1/messages",
+      payload: { role: "user", content: "hello" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().message.role).toBe("user");
+    expect(mockAddSessionMessage).toHaveBeenCalledWith("session-1", "user", "hello");
+  });
+
+  it("adds an assistant message to a session", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+    mockAddSessionMessage.mockResolvedValue({
+      id: "msg-2",
+      sessionId: "session-1",
+      role: "assistant",
+      content: "hi there",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sessions/session-1/messages",
+      payload: { role: "assistant", content: "hi there" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().message.role).toBe("assistant");
+  });
+
+  it("returns 404 for nonexistent session", async () => {
+    mockGetSession.mockResolvedValue(null);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sessions/nonexistent/messages",
+      payload: { role: "user", content: "hello" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe("Session not found");
+  });
+
+  it("rejects invalid role", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sessions/session-1/messages",
+      payload: { role: "invalid", content: "hello" },
+    });
+
+    expect(res.statusCode).toBe(500);
+  });
+
+  it("rejects empty content", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/sessions/session-1/messages",
+      payload: { role: "user", content: "" },
+    });
+
+    expect(res.statusCode).toBe(500);
   });
 });

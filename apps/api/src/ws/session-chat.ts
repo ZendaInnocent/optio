@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 import { parseClaudeEvent } from "../services/agent-event-parser.js";
 import { publishSessionEvent } from "../services/event-bus.js";
+import { addSessionMessage, trimSessionMessages } from "../services/interactive-session-service.js";
 import type { ExecSession, OptioSettings, AgentType } from "@optio/shared";
 import { authenticateWs, extractSessionToken } from "./ws-auth.js";
 import { getAdapter } from "@optio/agent-adapters";
@@ -115,6 +116,7 @@ export async function sessionChatWs(app: FastifyInstance) {
     let isProcessing = false;
     let outputBuffer = "";
     let promptCount = 0;
+    let assistantResponseBuffer = "";
 
     // Resolve auth env vars for the claude process
     const authEnv = await buildAuthEnv(log);
@@ -212,6 +214,11 @@ export async function sessionChatWs(app: FastifyInstance) {
             for (const entry of entries) {
               send({ type: "chat_event", event: entry });
 
+              // Collect assistant text responses for persistence
+              if (entry.type === "text" && entry.content) {
+                assistantResponseBuffer += entry.content;
+              }
+
               // Extract cost from result events
               if (entry.metadata?.cost && typeof entry.metadata.cost === "number") {
                 cumulativeCost += entry.metadata.cost;
@@ -249,6 +256,11 @@ export async function sessionChatWs(app: FastifyInstance) {
               const { entries } = parseClaudeEvent(outputBuffer, sessionId);
               for (const entry of entries) {
                 send({ type: "chat_event", event: entry });
+
+                // Collect assistant text responses for persistence
+                if (entry.type === "text" && entry.content) {
+                  assistantResponseBuffer += entry.content;
+                }
               }
               outputBuffer = "";
             }
@@ -259,6 +271,18 @@ export async function sessionChatWs(app: FastifyInstance) {
         log.error({ err }, "Failed to run claude prompt in session");
         send({ type: "error", message: "Failed to execute agent prompt" });
       } finally {
+        // Persist assistant response
+        if (assistantResponseBuffer.trim()) {
+          addSessionMessage(sessionId, "assistant", assistantResponseBuffer.trim()).catch((err) => {
+            log.warn({ err }, "Failed to persist assistant message");
+          });
+          // Trim old messages if over limit
+          trimSessionMessages(sessionId, 100).catch((err) => {
+            log.warn({ err }, "Failed to trim session messages");
+          });
+          assistantResponseBuffer = "";
+        }
+
         isProcessing = false;
         execSession = null;
         send({ type: "status", status: "idle" });
@@ -283,6 +307,10 @@ export async function sessionChatWs(app: FastifyInstance) {
             send({ type: "error", message: "Empty message" });
             return;
           }
+          // Persist user message to database
+          addSessionMessage(sessionId, "user", msg.content).catch((err) => {
+            log.warn({ err }, "Failed to persist user message");
+          });
           runPrompt(msg.content).catch((err) => {
             log.error({ err }, "Prompt execution failed");
             send({ type: "error", message: "Prompt failed" });

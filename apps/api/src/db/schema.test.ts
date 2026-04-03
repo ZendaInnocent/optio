@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { repos, workspaceMembers, customImages, optioSettings } from "../db/schema.js";
+import {
+  repos,
+  workspaceMembers,
+  customImages,
+  optioSettings,
+  sessionMessages,
+} from "../db/schema.js";
 
 describe("Database Schema", () => {
   describe("repos table", () => {
@@ -55,10 +61,36 @@ describe("Database Schema", () => {
       expect("defaultLanguagePreset" in optioSettings).toBe(true);
     });
 
+    it("has enabled_models column for OpenCode Zen models", () => {
+      expect("enabledModels" in optioSettings).toBe(true);
+    });
+
     it("has existing settings columns", () => {
       expect("model" in optioSettings).toBe(true);
       expect("agents" in optioSettings).toBe(true);
       expect("defaultAgent" in optioSettings).toBe(true);
+    });
+  });
+
+  describe("session_messages table", () => {
+    it("has sessionId column", () => {
+      expect("sessionId" in sessionMessages).toBe(true);
+    });
+
+    it("has role column", () => {
+      expect("role" in sessionMessages).toBe(true);
+    });
+
+    it("has content column", () => {
+      expect("content" in sessionMessages).toBe(true);
+    });
+
+    it("has timestamp column", () => {
+      expect("timestamp" in sessionMessages).toBe(true);
+    });
+
+    it("has id column", () => {
+      expect("id" in sessionMessages).toBe(true);
     });
   });
 });

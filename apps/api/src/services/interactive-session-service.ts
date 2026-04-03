@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { interactiveSessions, sessionPrs, repos, repoPods } from "../db/schema.js";
+import { interactiveSessions, sessionPrs, sessionMessages, repos, repoPods } from "../db/schema.js";
 import { publishEvent, publishSessionEvent } from "./event-bus.js";
 import { InteractiveSessionState, normalizeRepoUrl } from "@optio/shared";
 import { getOrCreateRepoPod, resolveAgentImage } from "./repo-pool-service.js";
@@ -216,4 +216,42 @@ export async function getActiveSessionCount(repoUrl?: string) {
     .where(and(...conditions));
 
   return count;
+}
+
+export async function getSessionMessages(sessionId: string, limit = 100) {
+  return db
+    .select()
+    .from(sessionMessages)
+    .where(eq(sessionMessages.sessionId, sessionId))
+    .orderBy(desc(sessionMessages.timestamp))
+    .limit(limit)
+    .then((rows) => rows.reverse());
+}
+
+export async function addSessionMessage(sessionId: string, role: string, content: string) {
+  const [message] = await db
+    .insert(sessionMessages)
+    .values({
+      sessionId,
+      role,
+      content,
+    })
+    .returning();
+  return message;
+}
+
+export async function trimSessionMessages(sessionId: string, maxMessages = 100) {
+  const messages = await db
+    .select({ id: sessionMessages.id })
+    .from(sessionMessages)
+    .where(eq(sessionMessages.sessionId, sessionId))
+    .orderBy(desc(sessionMessages.timestamp))
+    .offset(maxMessages);
+
+  if (messages.length > 0) {
+    const idsToDelete = messages.map((m) => m.id);
+    await db.delete(sessionMessages).where(sql`${sessionMessages.id} = ANY(${idsToDelete})`);
+  }
+
+  return messages.length;
 }

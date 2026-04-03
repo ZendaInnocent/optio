@@ -23,6 +23,13 @@ vi.mock("../db/schema.js", () => ({
     sessionId: "session_prs.session_id",
     createdAt: "session_prs.created_at",
   },
+  sessionMessages: {
+    id: "session_messages.id",
+    sessionId: "session_messages.session_id",
+    role: "session_messages.role",
+    content: "session_messages.content",
+    timestamp: "session_messages.timestamp",
+  },
   repos: {
     repoUrl: "repos.repo_url",
   },
@@ -67,6 +74,9 @@ import {
   updateSessionPr,
   getActiveSessionCount,
   updateSessionAgentType,
+  getSessionMessages,
+  addSessionMessage,
+  trimSessionMessages,
 } from "./interactive-session-service.js";
 
 describe("interactive-session-service", () => {
@@ -522,6 +532,110 @@ describe("interactive-session-service", () => {
 
       const result = await getActiveSessionCount("https://github.com/o/r");
       expect(result).toBe(2);
+    });
+  });
+
+  describe("getSessionMessages", () => {
+    it("returns messages ordered by timestamp ascending", async () => {
+      const messages = [
+        {
+          id: "msg-1",
+          role: "user",
+          content: "hello",
+          timestamp: new Date("2024-01-01T00:00:00Z"),
+        },
+        {
+          id: "msg-2",
+          role: "assistant",
+          content: "hi",
+          timestamp: new Date("2024-01-01T00:01:00Z"),
+        },
+      ];
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([...messages].reverse()),
+            }),
+          }),
+        }),
+      });
+
+      const result = await getSessionMessages("session-1");
+      expect(result).toHaveLength(2);
+      expect(result[0].role).toBe("user");
+      expect(result[1].role).toBe("assistant");
+    });
+
+    it("uses default limit of 100", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      });
+
+      await getSessionMessages("session-1");
+      const selectChain = (db.select as any).mock.results[0].value;
+      expect(selectChain).toBeDefined();
+    });
+  });
+
+  describe("addSessionMessage", () => {
+    it("inserts a message and returns it", async () => {
+      const message = { id: "msg-1", sessionId: "s-1", role: "user", content: "hello" };
+      (db.insert as any) = vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([message]),
+        }),
+      });
+
+      const result = await addSessionMessage("s-1", "user", "hello");
+      expect(result).toEqual(message);
+    });
+  });
+
+  describe("trimSessionMessages", () => {
+    it("does nothing when under limit", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              offset: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      });
+
+      const deleted = await trimSessionMessages("s-1", 100);
+      expect(deleted).toBe(0);
+    });
+
+    it("deletes excess messages when over limit", async () => {
+      const excessMessages = [{ id: "msg-old-1" }, { id: "msg-old-2" }, { id: "msg-old-3" }];
+      let selectCallCount = 0;
+      (db.select as any) = vi.fn().mockImplementation(() => {
+        selectCallCount++;
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                offset: vi.fn().mockResolvedValue(selectCallCount === 1 ? excessMessages : []),
+              }),
+            }),
+          }),
+        };
+      });
+      (db.delete as any) = vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const deleted = await trimSessionMessages("s-1", 100);
+      expect(deleted).toBe(3);
+      expect(db.delete).toHaveBeenCalled();
     });
   });
 });

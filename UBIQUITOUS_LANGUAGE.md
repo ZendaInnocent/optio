@@ -109,6 +109,9 @@
 > **Dev:** "So the **Agent Type** determines which **Agent Adapter** is used, and each adapter handles its own quirks?"
 > **Domain expert:** "Exactly. Adding a new agent means implementing the **Agent Adapter** interface and registering it. The rest of the system—queuing, pod management, PR watching—works uniformly."
 
+| **Session Message** | A persisted chat message in a session, with role (user/assistant), content, and timestamp | Chat message, conversation entry |
+| **Message History** | The ordered collection of session messages, limited to the last 100 per session | Chat history, conversation log |
+
 ## Database & Infrastructure
 
 | Term                   | Definition                                                                                     | Aliases to avoid          |
