@@ -27,6 +27,7 @@ import {
   validateRequiredSecrets,
 } from "../services/secret-service.js";
 import { getPromptTemplate } from "../services/prompt-template-service.js";
+import { promptLoader } from "../lib/agent/prompt-loader.js";
 import { logger } from "../logger.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -226,8 +227,9 @@ export function startTaskWorker() {
             : undefined;
         const optioApiUrl = `http://${process.env.API_HOST ?? "host.docker.internal"}:${process.env.API_PORT ?? "4000"}`;
 
-        // Load and render prompt template
-        const promptConfig = await getPromptTemplate(task.repoUrl);
+        // Load and render prompt template based on workflow type
+        const workflowType = (task as any).workflowType ?? "do-work";
+        const promptConfig = await getPromptTemplate(task.repoUrl, workflowType);
 
         // repoConfig already loaded above for concurrency check
 

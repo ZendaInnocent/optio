@@ -80,6 +80,7 @@ export const api = {
     repoUrl: string;
     repoBranch?: string;
     agentType: string;
+    workflowType?: "do-work" | "plan" | "review";
     ticketSource?: string;
     ticketExternalId?: string;
     metadata?: Record<string, unknown>;
@@ -910,11 +911,14 @@ export const api = {
     defaultAgent?: string;
     defaultAgentType?: string;
     defaultLanguagePreset?: string;
+    enabledModels?: string[];
   }) =>
     request<{ settings: any }>("/api/optio/settings", {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  getAvailableModels: () => request<{ models: any[] }>("/api/optio/settings/models"),
 
   // Image Configuration
   listAgents: () =>

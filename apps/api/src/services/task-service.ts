@@ -37,6 +37,7 @@ export async function createTask(input: CreateTaskInput & { workspaceId?: string
       repoUrl: normalizeRepoUrl(input.repoUrl),
       repoBranch: input.repoBranch ?? "main",
       agentType,
+      workflowType: input.workflowType ?? "do-work",
       ticketSource: input.ticketSource,
       ticketExternalId: input.ticketExternalId,
       metadata: input.metadata,

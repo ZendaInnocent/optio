@@ -11,6 +11,8 @@ export enum TaskState {
   CANCELLED = "cancelled",
 }
 
+export type WorkflowType = "do-work" | "plan" | "review";
+
 export interface Task {
   id: string;
   title: string;
@@ -19,6 +21,7 @@ export interface Task {
   repoBranch: string;
   state: TaskState;
   agentType: string;
+  workflowType: WorkflowType;
   containerId?: string;
   prUrl?: string;
   resultSummary?: string;
@@ -65,6 +68,7 @@ export interface CreateTaskInput {
   repoUrl: string;
   repoBranch?: string;
   agentType?: string;
+  workflowType?: WorkflowType;
   ticketSource?: string;
   ticketExternalId?: string;
   metadata?: Record<string, unknown>;

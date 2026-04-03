@@ -1,15 +1,26 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { promptTemplates, repos } from "../db/schema.js";
-import { DEFAULT_PROMPT_TEMPLATE, normalizeRepoUrl } from "@optio/shared";
+import {
+  DEFAULT_PROMPT_TEMPLATE,
+  DEFAULT_REVIEW_PROMPT_TEMPLATE,
+  normalizeRepoUrl,
+} from "@optio/shared";
+import { promptLoader } from "../lib/agent/prompt-loader.js";
+
+export type WorkflowType = "do-work" | "plan" | "review";
 
 /**
- * Get the prompt template for a repo. Priority:
+ * Get the prompt template for a repo and workflow type. Priority:
  * 1. Repo-level override (repos.promptTemplateOverride)
- * 2. Global default (prompt_templates table)
- * 3. Hardcoded default
+ * 2. Modular prompt from .agents/prompts/ via PromptLoader
+ * 3. Global default (prompt_templates table)
+ * 4. Hardcoded default
  */
-export async function getPromptTemplate(repoUrl?: string): Promise<{
+export async function getPromptTemplate(
+  repoUrl?: string,
+  workflowType?: WorkflowType,
+): Promise<{
   id: string;
   template: string;
   autoMerge: boolean;
@@ -27,7 +38,7 @@ export async function getPromptTemplate(repoUrl?: string): Promise<{
     }
     // Also use the repo's autoMerge setting even if no prompt override
     if (repo) {
-      const globalTemplate = await getGlobalDefault();
+      const globalTemplate = await getGlobalDefault(workflowType);
       return {
         ...globalTemplate,
         autoMerge: repo.autoMerge,
@@ -35,10 +46,10 @@ export async function getPromptTemplate(repoUrl?: string): Promise<{
     }
   }
 
-  return getGlobalDefault();
+  return getGlobalDefault(workflowType);
 }
 
-async function getGlobalDefault(): Promise<{
+async function getGlobalDefault(workflowType?: WorkflowType): Promise<{
   id: string;
   template: string;
   autoMerge: boolean;
@@ -56,11 +67,37 @@ async function getGlobalDefault(): Promise<{
     };
   }
 
-  return {
-    id: "builtin",
-    template: DEFAULT_PROMPT_TEMPLATE,
-    autoMerge: false,
-  };
+  // Fall back to modular prompts from .agents/prompts/ if no DB template exists
+  if (workflowType) {
+    try {
+      const loaded = await promptLoader.load({ type: workflowType });
+      return {
+        id: `modular:${workflowType}`,
+        template: loaded.content,
+        autoMerge: false,
+      };
+    } catch {
+      // Fall through to hardcoded defaults
+    }
+  }
+
+  // Hardcoded defaults by workflow type
+  switch (workflowType) {
+    case "review":
+      return {
+        id: "builtin",
+        template: DEFAULT_REVIEW_PROMPT_TEMPLATE,
+        autoMerge: false,
+      };
+    case "plan":
+    case "do-work":
+    default:
+      return {
+        id: "builtin",
+        template: DEFAULT_PROMPT_TEMPLATE,
+        autoMerge: false,
+      };
+  }
 }
 
 /**

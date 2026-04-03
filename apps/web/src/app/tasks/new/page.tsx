@@ -25,6 +25,7 @@ export default function NewTaskPage() {
     repoUrl: "",
     repoBranch: "main",
     agentType: "claude-code",
+    workflowType: "do-work" as "do-work" | "plan" | "review",
     maxRetries: 3,
     priority: 100,
   });
@@ -123,6 +124,7 @@ export default function NewTaskPage() {
         repoUrl: form.repoUrl,
         repoBranch: form.repoBranch,
         agentType: form.agentType,
+        workflowType: form.workflowType,
         maxRetries: form.maxRetries,
         priority: form.priority,
         ...(selectedDeps.length > 0 ? { dependsOn: selectedDeps } : {}),
@@ -222,6 +224,32 @@ export default function NewTaskPage() {
             placeholder="Describe what the agent should do. Be specific about requirements, files to modify, and expected behavior."
             className="w-full px-3 py-2 rounded-lg bg-bg-card border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors resize-y"
           />
+        </div>
+
+        {/* Workflow Type */}
+        <div>
+          <label className="block text-sm text-text-muted mb-1.5">Workflow</label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: "do-work" as const, label: "Do Work", desc: "Implement code and open a PR" },
+              { value: "plan" as const, label: "Plan", desc: "Analyze and decompose requirements" },
+              { value: "review" as const, label: "Review", desc: "Review an existing PR" },
+            ].map((wf) => (
+              <button
+                key={wf.value}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, workflowType: wf.value }))}
+                className={`px-3 py-2.5 rounded-lg border text-left transition-colors ${
+                  form.workflowType === wf.value
+                    ? "border-primary bg-primary/5 text-text"
+                    : "border-border bg-bg-card text-text-muted hover:text-text hover:border-text-muted/30"
+                }`}
+              >
+                <div className="text-sm font-medium">{wf.label}</div>
+                <div className="text-xs text-text-muted/60 mt-0.5">{wf.desc}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Branch + Agent Type row */}

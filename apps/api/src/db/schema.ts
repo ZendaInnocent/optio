@@ -140,6 +140,7 @@ export const tasks = pgTable(
     priority: integer("priority").notNull().default(100), // lower = higher priority
     parentTaskId: uuid("parent_task_id"), // for review tasks linked to a coding task
     taskType: text("task_type").notNull().default("coding"), // "coding" | "review"
+    workflowType: text("workflow_type").notNull().default("do-work"), // "do-work" | "plan" | "review"
     subtaskOrder: integer("subtask_order").default(0), // ordering within parent's subtasks
     blocksParent: boolean("blocks_parent").notNull().default(false), // if true, parent waits for this
     worktreeState: text("worktree_state"), // "active" | "dirty" | "reset" | "preserved" | "removed"
@@ -659,6 +660,7 @@ export const optioSettings = pgTable(
     defaultAgent: text("default_agent").notNull().default("claude-code"),
     defaultAgentType: text("default_agent_type"),
     defaultLanguagePreset: text("default_language_preset"),
+    enabledModels: jsonb("enabled_models").$type<string[]>().notNull().default([]), // OpenCode Zen model IDs user has enabled
     workspaceId: uuid("workspace_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
