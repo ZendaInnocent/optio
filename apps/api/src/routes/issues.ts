@@ -3,7 +3,7 @@ import { db } from "../db/client.js";
 import { repos, tasks } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { normalizeRepoUrl } from "@optio/shared";
-import { retrieveSecret } from "../services/secret-service.js";
+import { retrieveSecretWithFallback } from "../services/secret-service.js";
 import { logger } from "../logger.js";
 
 export async function issueRoutes(app: FastifyInstance) {
@@ -13,7 +13,11 @@ export async function issueRoutes(app: FastifyInstance) {
 
     let githubToken: string;
     try {
-      githubToken = await retrieveSecret("GITHUB_TOKEN");
+      githubToken = await retrieveSecretWithFallback(
+        "GITHUB_TOKEN",
+        "global",
+        req.user?.workspaceId,
+      );
     } catch {
       return reply.status(503).send({ issues: [], error: "No GitHub token configured" });
     }
@@ -151,7 +155,7 @@ export async function issueRoutes(app: FastifyInstance) {
 
     let githubToken: string;
     try {
-      githubToken = await retrieveSecret("GITHUB_TOKEN");
+      githubToken = await retrieveSecretWithFallback("GITHUB_TOKEN", "global", wsId);
     } catch {
       return reply.status(503).send({ error: "No GitHub token configured" });
     }

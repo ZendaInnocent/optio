@@ -11,6 +11,7 @@ import {
   GitBranch,
   Bot,
   Container,
+  Settings,
 } from "lucide-react";
 
 function QuickLink({
@@ -42,10 +43,10 @@ export function WelcomeHero({ repoCount }: { repoCount: number }) {
   const steps = [
     {
       num: 1,
-      icon: KeyRound,
-      title: "Configure secrets",
-      description: "Add your Anthropic API key or connect Claude Max credentials.",
-      href: "/secrets",
+      icon: Settings,
+      title: "Configure settings",
+      description: "Set up your agents and add required API keys.",
+      href: "/settings",
       done: false,
     },
     {
@@ -178,10 +179,10 @@ export function WelcomeHero({ repoCount }: { repoCount: number }) {
           href="/cluster"
         />
         <QuickLink
-          icon={KeyRound}
-          label="Secrets"
-          description="API keys & tokens"
-          href="/secrets"
+          icon={Settings}
+          label="Settings"
+          description="Configure agents & secrets"
+          href="/settings"
         />
       </div>
     </div>

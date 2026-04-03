@@ -40,6 +40,7 @@ export class OpencodeAdapter implements AgentAdapter {
     const modelFlag = model ? `--model ${model}` : "";
     const script = [
       "set -e",
+      "export PATH=/usr/local/bin:/root/.local/bin:$PATH",
       ...Object.entries(authEnv ?? {}).map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\\''")}'`),
       `opencode run '${escapedPrompt}' ${modelFlag} --format json 2>&1 || true`,
     ].join(" && ");

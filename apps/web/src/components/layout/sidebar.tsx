@@ -38,7 +38,6 @@ const MAIN_NAV = [
 ];
 
 const SECONDARY_NAV = [
-  { href: "/secrets", label: "Secrets", icon: KeyRound },
   { href: "/workspace-settings", label: "Workspace", icon: Building2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

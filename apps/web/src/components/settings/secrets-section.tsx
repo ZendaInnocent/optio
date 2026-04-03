@@ -1,0 +1,291 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { api } from "@/lib/api-client";
+import { toast } from "sonner";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  KeyRound,
+  Globe,
+  FolderGit2,
+  Filter,
+  AlertCircle,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
+
+const AGENT_REQUIREMENTS: Record<string, string[]> = {
+  "claude-code": ["ANTHROPIC_API_KEY"],
+  codex: ["OPENAI_API_KEY"],
+  opencode: [],
+};
+
+export function SecretsSection() {
+  const [secrets, setSecrets] = useState<any[]>([]);
+  const [repos, setRepos] = useState<any[]>([]);
+  const [optioSettings, setOptioSettings] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", value: "", scope: "global" });
+  const [submitting, setSubmitting] = useState(false);
+  const [scopeFilter, setScopeFilter] = useState<string>("all");
+
+  const loadSecrets = () => {
+    const scope = scopeFilter === "all" ? undefined : scopeFilter;
+    api
+      .listSecrets(scope)
+      .then((res) => setSecrets(res.secrets))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  const requiredSecrets = useMemo(() => {
+    const required = new Set<string>();
+    if (optioSettings?.agents) {
+      for (const agent of optioSettings.agents) {
+        if (agent.enabled && AGENT_REQUIREMENTS[agent.type]) {
+          for (const secret of AGENT_REQUIREMENTS[agent.type]) {
+            required.add(secret);
+          }
+        }
+      }
+    }
+    return Array.from(required);
+  }, [optioSettings]);
+
+  const secretNames = useMemo(() => new Set(secrets.map((s: any) => s.name)), [secrets]);
+
+  const missingSecrets = useMemo(
+    () => requiredSecrets.filter((s) => !secretNames.has(s)),
+    [requiredSecrets, secretNames],
+  );
+
+  const presentSecrets = useMemo(
+    () => requiredSecrets.filter((s) => secretNames.has(s)),
+    [requiredSecrets, secretNames],
+  );
+
+  useEffect(() => {
+    Promise.all([api.listRepos(), api.getOptioSettings()])
+      .then(([reposRes, settingsRes]) => {
+        setRepos(reposRes.repos);
+        setOptioSettings(settingsRes.settings);
+      })
+      .catch(() => {});
+    loadSecrets();
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    loadSecrets();
+  }, [scopeFilter]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.createSecret(form);
+      toast.success("Secret saved", { description: `${form.name} has been encrypted and stored.` });
+      setForm({ name: "", value: "", scope: "global" });
+      setShowForm(false);
+      loadSecrets();
+    } catch (err) {
+      toast.error("Failed to save secret", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (name: string, scope: string) => {
+    try {
+      await api.deleteSecret(name, scope);
+      toast.success("Secret deleted");
+      loadSecrets();
+    } catch (err) {
+      toast.error("Failed to delete secret");
+    }
+  };
+
+  const scopeLabel = (scope: string) => {
+    if (scope === "global") return "Global";
+    const repo = repos.find((r) => r.repoUrl === scope);
+    return repo?.fullName ?? scope;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Required secrets banner */}
+      {optioSettings?.agents && requiredSecrets.length > 0 && (
+        <div className="p-4 rounded-xl border border-border/50 bg-bg-card">
+          <h3 className="text-sm font-medium mb-3">Required for enabled agents</h3>
+          <div className="space-y-2">
+            {presentSecrets.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-text-muted">Configured:</span>
+                {presentSecrets.map((secret: string) => (
+                  <span
+                    key={secret}
+                    className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-xs"
+                  >
+                    {secret}
+                  </span>
+                ))}
+              </div>
+            )}
+            {missingSecrets.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <span className="text-text-muted">Missing:</span>
+                {missingSecrets.map((secret: string) => (
+                  <span
+                    key={secret}
+                    className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-xs"
+                  >
+                    {secret}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add secret form */}
+      {showForm && (
+        <form
+          onSubmit={handleCreate}
+          className="p-5 rounded-xl border border-border/50 bg-bg-card space-y-3"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-text-muted mb-1">Name</label>
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="ANTHROPIC_API_KEY"
+                className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-text-muted mb-1">Scope</label>
+              <select
+                value={form.scope}
+                onChange={(e) => setForm((f) => ({ ...f, scope: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+              >
+                <option value="global">Global (all repos)</option>
+                {repos.map((repo) => (
+                  <option key={repo.id} value={repo.repoUrl}>
+                    {repo.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-text-muted mb-1">Value</label>
+            <input
+              required
+              type="password"
+              value={form.value}
+              onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+              placeholder="sk-ant-..."
+              className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
+            >
+              {submitting ? "Saving..." : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded-md bg-bg-hover text-text-muted text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-text-muted" />
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+          >
+            <option value="all">All scopes</option>
+            <option value="global">Global only</option>
+            {repos.map((repo) => (
+              <option key={repo.id} value={repo.repoUrl}>
+                {repo.fullName}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white text-sm hover:bg-primary-hover transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Secret
+        </button>
+      </div>
+
+      {/* Secrets list */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8 text-text-muted">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          Loading...
+        </div>
+      ) : secrets.length === 0 ? (
+        <div className="text-center py-8 text-text-muted border border-dashed border-border rounded-lg">
+          <KeyRound className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>No secrets configured</p>
+          <p className="text-xs mt-1">Add API keys for Claude Code or Codex to get started.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {secrets.map((secret: any) => (
+            <div
+              key={secret.id}
+              className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-bg-card"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">{secret.name}</span>
+                <span className="inline-flex items-center gap-1 text-xs text-text-muted px-2 py-0.5 rounded-full bg-bg-hover">
+                  {secret.scope === "global" ? (
+                    <Globe className="w-3 h-3" />
+                  ) : (
+                    <FolderGit2 className="w-3 h-3" />
+                  )}
+                  {scopeLabel(secret.scope)}
+                </span>
+              </div>
+              <button
+                onClick={() => handleDelete(secret.name, secret.scope)}
+                className="p-1.5 rounded-md hover:bg-error/10 text-text-muted hover:text-error transition-colors"
+                title="Delete secret"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

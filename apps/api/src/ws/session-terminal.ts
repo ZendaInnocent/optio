@@ -90,8 +90,10 @@ export async function sessionTerminalWs(app: FastifyInstance) {
       // Create worktree if not exists
       `if [ ! -d "${worktreePath}" ]; then`,
       `  git branch -D "${branch}" 2>/dev/null || true`,
-      `  git worktree add "${worktreePath}" -b "${branch}" origin/$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo main) 2>/dev/null || git worktree add "${worktreePath}" -b "${branch}" HEAD`,
+      `  git worktree add "${worktreePath}" -b "${branch}" origin/$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo main) 2>/dev/null || git worktree add "${worktreePath}" -b "${branch}" HEAD || {`,
+      `    echo "ERROR: Failed to create worktree at ${worktreePath}"; exit 1; }`,
       `fi`,
+      `[ -d "${worktreePath}" ] || { echo "ERROR: Worktree not created at ${worktreePath}"; exit 1; }`,
       "flock -u 9",
       "exec 9>&-",
       // Launch interactive shell in worktree

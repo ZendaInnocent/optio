@@ -350,10 +350,10 @@ function RepoStep({
             <p className="text-sm text-error">{validationError}</p>
             {validationError.includes("GitHub token") && (
               <Link
-                href="/secrets"
+                href="/settings"
                 className="text-sm text-primary hover:underline mt-1 inline-block"
               >
-                Go to Secrets →
+                Go to Settings →
               </Link>
             )}
           </div>

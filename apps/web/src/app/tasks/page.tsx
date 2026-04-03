@@ -123,6 +123,7 @@ function IssuesBrowser() {
   const [selectedRepo, setSelectedRepo] = useState("");
   const [assigning, setAssigning] = useState<number | null>(null);
   const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -133,10 +134,11 @@ function IssuesBrowser() {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     api
       .listIssues({ repoId: selectedRepo || undefined })
       .then((res) => setIssues(res.issues))
-      .catch(() => {})
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [selectedRepo]);
 
@@ -244,6 +246,17 @@ function IssuesBrowser() {
         <div className="flex items-center justify-center py-12 text-text-muted">
           <Loader2 className="w-5 h-5 animate-spin mr-2" />
           Loading issues from GitHub...
+        </div>
+      ) : error ? (
+        <div className="text-center py-12 text-text-muted border border-dashed border-border rounded-lg">
+          <CircleDot className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>GitHub token required</p>
+          <p className="text-xs mt-1">
+            Add a GitHub token in{" "}
+            <Link href="/settings" className="text-primary hover:text-primary-hover">
+              Settings → Secrets
+            </Link>
+          </p>
         </div>
       ) : issues.length === 0 ? (
         <div className="text-center py-12 text-text-muted border border-dashed border-border rounded-lg">
