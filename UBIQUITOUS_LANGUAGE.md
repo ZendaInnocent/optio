@@ -36,6 +36,14 @@
 | **ACP**              | Agent Client Protocol, a standardized protocol for agent communication                             | Protocol                    |
 | **TUI**              | Terminal User Interface, the interactive mode of OpenCode (not used by Optio)                      | Interactive mode            |
 
+## OpenCode Zen Models
+
+| Term               | Definition                                                                   | Aliases to avoid |
+| ------------------ | ---------------------------------------------------------------------------- | ---------------- |
+| **Free Model**     | An OpenCode Zen model that can be used without an API key                    | -                |
+| **Paid Model**     | An OpenCode Zen model that requires a provider-specific API key              | -                |
+| **Enabled Models** | The set of OpenCode Zen models a user has enabled for use in their workspace | -                |
+
 ## Repository & Configuration
 
 | Term                   | Definition                                                                   | Aliases to avoid            |

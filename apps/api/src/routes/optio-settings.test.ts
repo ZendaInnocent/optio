@@ -6,10 +6,20 @@ import type { FastifyInstance } from "fastify";
 
 const mockGetSettings = vi.fn();
 const mockUpsertSettings = vi.fn();
+const mockGetAvailableModels = vi.fn();
+const mockListUserApiKeys = vi.fn();
 
 vi.mock("../services/optio-settings-service.js", () => ({
   getSettings: (...args: unknown[]) => mockGetSettings(...args),
   upsertSettings: (...args: unknown[]) => mockUpsertSettings(...args),
+}));
+
+vi.mock("../services/model-catalog-service.js", () => ({
+  getAvailableModels: (...args: unknown[]) => mockGetAvailableModels(...args),
+}));
+
+vi.mock("../services/user-api-keys-service.js", () => ({
+  listUserApiKeys: (...args: unknown[]) => mockListUserApiKeys(...args),
 }));
 
 import { optioSettingsRoutes } from "./optio-settings.js";
@@ -29,6 +39,7 @@ const defaultSettings = {
     { type: "opencode", enabled: true, requiredSecrets: [] },
   ],
   defaultAgent: "opencode" as const,
+  enabledModels: [],
   workspaceId: null,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
@@ -38,7 +49,7 @@ async function buildTestApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   app.decorateRequest("user", undefined as any);
   app.addHook("preHandler", (req, _reply, done) => {
-    (req as any).user = { workspaceId: "ws-1", workspaceRole: "admin" };
+    (req as any).user = { id: "user-123", workspaceId: "ws-1", workspaceRole: "admin" };
     done();
   });
   // Mirror the server's ZodError handler
@@ -60,6 +71,7 @@ describe("GET /api/optio/settings", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockListUserApiKeys.mockResolvedValue([]);
     app = await buildTestApp();
   });
 
@@ -286,5 +298,93 @@ describe("PUT /api/optio/settings", () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("GET /api/optio/settings/models", () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    app = await buildTestApp();
+  });
+
+  it("returns available models with enabled status", async () => {
+    mockGetSettings.mockResolvedValue({
+      ...defaultSettings,
+      enabledModels: ["opencode/big-pickle", "anthropic/claude-sonnet-4-20250514"],
+    });
+    mockGetAvailableModels.mockResolvedValue([
+      { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
+      {
+        id: "mimo-v2-pro-free",
+        name: "Mimo V2 Pro (Free)",
+        provider: "opencode-zen",
+        isFree: true,
+      },
+      {
+        id: "anthropic/claude-sonnet-4-20250514",
+        name: "Claude Sonnet 4",
+        provider: "anthropic",
+        isFree: false,
+      },
+    ]);
+
+    const res = await app.inject({ method: "GET", url: "/api/optio/settings/models" });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.models).toHaveLength(3);
+    expect(body.models[0]).toMatchObject({
+      id: "opencode/big-pickle",
+      name: "Big Pickle",
+      provider: "opencode-zen",
+      isFree: true,
+      enabled: true,
+    });
+    expect(body.models[2]).toMatchObject({
+      id: "anthropic/claude-sonnet-4-20250514",
+      isFree: false,
+      enabled: true,
+    });
+    expect(mockGetSettings).toHaveBeenCalledWith("ws-1");
+    expect(mockGetAvailableModels).toHaveBeenCalledWith("user-123"); // from preHandler
+  });
+
+  it("returns empty enabled when no settings", async () => {
+    mockGetSettings.mockResolvedValue({
+      ...defaultSettings,
+      enabledModels: [],
+    });
+    mockGetAvailableModels.mockResolvedValue([
+      { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
+    ]);
+
+    const res = await app.inject({ method: "GET", url: "/api/optio/settings/models" });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.models[0].enabled).toBe(false);
+  });
+
+  it("includes only free models when no API keys", async () => {
+    mockGetSettings.mockResolvedValue(defaultSettings);
+    mockGetAvailableModels.mockResolvedValue([
+      { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
+      {
+        id: "mimo-v2-pro-free",
+        name: "Mimo V2 Pro (Free)",
+        provider: "opencode-zen",
+        isFree: true,
+      },
+    ]);
+
+    const res = await app.inject({ method: "GET", url: "/api/optio/settings/models" });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    body.models.forEach((m: any) => {
+      expect(m.isFree).toBe(true);
+    });
   });
 });

@@ -15,6 +15,7 @@ export interface OptioSettings {
   maxTurns: number;
   agents: OptioAgentConfig[];
   defaultAgent: AgentType;
+  enabledModels: string[]; // OpenCode Zen model IDs user has enabled
   workspaceId?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,7 @@ export interface UpdateOptioSettingsInput {
   maxTurns?: number;
   agents?: AgentConfigInput[];
   defaultAgent?: AgentType;
+  enabledModels?: string[];
 }
 
 export interface AgentConfigInput {

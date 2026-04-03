@@ -79,6 +79,9 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [sessionCount, setSessionCount] = useState(0);
   const [creatingSession, setCreatingSession] = useState(false);
 
+  // OpenCode models
+  const [availableOpenCodeModels, setAvailableOpenCodeModels] = useState<any[]>([]);
+
   // MCP Servers
   const [mcpServers, setMcpServers] = useState<any[]>([]);
   const [showAddMcp, setShowAddMcp] = useState(false);
@@ -111,6 +114,14 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [savingImageConfig, setSavingImageConfig] = useState(false);
 
   useEffect(() => {
+    // Fetch OpenCode models catalog
+    api
+      .getAvailableModels()
+      .then((res) => {
+        setAvailableOpenCodeModels(res.models);
+      })
+      .catch(() => setAvailableOpenCodeModels([]));
+
     api
       .getRepo(id)
       .then((res) => {
@@ -927,15 +938,22 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-text-muted mb-1">Model</label>
-            <input
+            <select
               value={opencodeModel}
               onChange={(e) => setOpencodeModel(e.target.value)}
-              placeholder="e.g. anthropic/claude-sonnet-4-20250514"
               className="w-full px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-            />
+            >
+              <option value="">OpenCode default</option>
+              {availableOpenCodeModels.map((m) => (
+                <option key={m.id} value={m.id} disabled={!m.enabled}>
+                  {m.name} {m.isFree ? "(Free)" : "(Paid)"} {!m.enabled && "— Disabled"}
+                </option>
+              ))}
+            </select>
             <p className="text-[10px] text-text-muted/60 mt-1">
-              Model ID in format <code>provider/model-id</code>. Leave empty to use OpenCode
-              default.
+              Select a model. Free models work without an API key. Paid models require the
+              corresponding provider's API key in Secrets. Disabled models are not enabled in
+              Settings.
             </p>
           </div>
           <div>

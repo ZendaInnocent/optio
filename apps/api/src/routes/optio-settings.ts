@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import * as optioSettingsService from "../services/optio-settings-service.js";
 import * as userApiKeysService from "../services/user-api-keys-service.js";
+import { getAvailableModels } from "../services/model-catalog-service.js";
 
 const agentConfigInputSchema = z.object({
   type: z.enum(["claude-code", "codex", "opencode"]),
@@ -76,5 +77,29 @@ export async function optioSettingsRoutes(app: FastifyInstance) {
     const input = apiKeyInputSchema.parse(req.body);
     await userApiKeysService.deleteUserApiKey(userId, input.provider);
     reply.send({ success: true });
+  });
+
+  // Get available OpenCode Zen models
+  app.get("/api/optio/settings/models", async (req, reply) => {
+    const workspaceId = req.user?.workspaceId ?? null;
+    const userId = req.user?.id;
+
+    // Fetch available models based on user's API keys
+    const available = await getAvailableModels(userId);
+
+    // Fetch user's currently enabled models
+    const enabled = await optioSettingsService.getSettings(workspaceId);
+
+    // Map to the response format expected by UI
+    const models = available.map((m) => ({
+      id: m.id,
+      name: m.name,
+      provider: m.provider,
+      isFree: m.isFree,
+      description: m.description,
+      enabled: enabled.enabledModels.includes(m.id),
+    }));
+
+    reply.send({ models });
   });
 }

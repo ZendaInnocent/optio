@@ -914,7 +914,13 @@ function OptioAgentSettings() {
   const [saving, setSaving] = useState(false);
   const [showBasePrompt, setShowBasePrompt] = useState(false);
 
+  // OpenCode Models state
+  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [enabledModelIds, setEnabledModelIds] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+
   useEffect(() => {
+    // Fetch Optio settings
     api
       .getOptioSettings()
       .then((res) => {
@@ -926,9 +932,25 @@ function OptioAgentSettings() {
         );
         setConfirmWrites(s.confirmWrites);
         setMaxTurns(s.maxTurns);
+        // enabledModels from settings (initial value, will be overwritten by models endpoint)
+        if (s.enabledModels && s.enabledModels.length > 0) {
+          setEnabledModelIds(s.enabledModels);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Fetch OpenCode Zen models catalog
+    api
+      .getAvailableModels()
+      .then((res) => {
+        setAvailableModels(res.models);
+        // Set enabled models based on what's enabled in the catalog
+        const enabled = res.models.filter((m: any) => m.enabled).map((m: any) => m.id);
+        setEnabledModelIds(enabled);
+      })
+      .catch(() => {})
+      .finally(() => setModelsLoading(false));
   }, []);
 
   const handleSave = async () => {
@@ -945,6 +967,7 @@ function OptioAgentSettings() {
         enabledTools: toolsToSave.length === 0 ? ALL_OPTIO_TOOL_NAMES : toolsToSave,
         confirmWrites,
         maxTurns,
+        enabledModels: enabledModelIds.length > 0 ? enabledModelIds : [],
       });
       toast.success("Optio agent settings saved");
     } catch (err) {
@@ -1108,6 +1131,63 @@ function OptioAgentSettings() {
           max={50}
           className="w-32 px-3 py-2 rounded-lg bg-bg border border-border text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
         />
+      </div>
+
+      {/* OpenCode Models */}
+      <div className="border-t border-border pt-6">
+        <h3 className="text-sm font-medium text-text-muted mb-3 flex items-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          OpenCode Models
+        </h3>
+        {modelsLoading ? (
+          <div className="flex items-center gap-2 text-sm text-text-muted">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading models...
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-text-muted">
+              Select which OpenCode Zen models are available for use. Free models work without an
+              API key. Paid models require you to add the corresponding provider's API key in
+              Secrets.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {availableModels.map((model: any) => (
+                <div
+                  key={model.id}
+                  className="flex items-start gap-3 p-3 rounded-lg border border-border bg-bg-card"
+                >
+                  <input
+                    type="checkbox"
+                    checked={enabledModelIds.includes(model.id)}
+                    onChange={() => {
+                      setEnabledModelIds((prev) =>
+                        prev.includes(model.id)
+                          ? prev.filter((id) => id !== model.id)
+                          : [...prev, model.id],
+                      );
+                    }}
+                    className="mt-1 w-4 h-4 rounded"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{model.name}</span>
+                      {model.isFree ? (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-success/20 text-success">
+                          Free
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-primary/20 text-primary">
+                          Paid
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-text-muted">{model.provider}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Save Button */}

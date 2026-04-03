@@ -64,6 +64,7 @@ export async function getSettings(workspaceId?: string | null): Promise<OptioSet
     maxTurns: 20,
     agents: addRequiredSecrets(DEFAULT_AGENTS_STORAGE),
     defaultAgent: "opencode" as AgentType,
+    enabledModels: [],
     workspaceId: workspaceId ?? null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -97,6 +98,7 @@ export async function upsertSettings(
     if (input.maxTurns !== undefined) updates.maxTurns = input.maxTurns;
     if (input.agents !== undefined) updates.agents = input.agents;
     if (input.defaultAgent !== undefined) updates.defaultAgent = input.defaultAgent;
+    if (input.enabledModels !== undefined) updates.enabledModels = input.enabledModels;
 
     const [row] = await db
       .update(optioSettings)
@@ -116,6 +118,7 @@ export async function upsertSettings(
         maxTurns: input.maxTurns ?? 20,
         agents: input.agents ?? DEFAULT_AGENTS_STORAGE,
         defaultAgent: input.defaultAgent ?? "opencode",
+        enabledModels: input.enabledModels ?? [],
         workspaceId: workspaceId ?? undefined,
       })
       .returning();
@@ -134,6 +137,7 @@ function mapRow(row: typeof optioSettings.$inferSelect): OptioSettings {
     maxTurns: row.maxTurns,
     agents: addRequiredSecrets(storedAgents),
     defaultAgent: (row.defaultAgent ?? "opencode") as AgentType,
+    enabledModels: row.enabledModels ?? [],
     workspaceId: row.workspaceId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
