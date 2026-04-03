@@ -110,7 +110,9 @@ vi.mock("../services/secret-service.js", () => ({
 }));
 
 vi.mock("@optio/agent-adapters", () => ({
-  getAgentConfig: vi.fn(() => ({ requiredSecrets: [] })),
+  getAdapter: vi.fn(() => ({
+    validateSecrets: vi.fn(() => ({ valid: true, missing: [] })),
+  })),
 }));
 
 vi.mock("../db/client.js", () => ({

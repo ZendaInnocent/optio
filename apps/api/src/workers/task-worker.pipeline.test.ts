@@ -208,8 +208,8 @@ vi.mock("@optio/agent-adapters", () => ({
 }));
 
 vi.mock("@optio/agent-adapters", () => ({
-  getAgentConfig: vi.fn(() => ({ requiredSecrets: [] })),
   getAdapter: vi.fn(() => ({
+    validateSecrets: vi.fn(() => ({ valid: true, missing: [] })),
     buildContainerConfig: vi.fn(() => ({ image: "optio/agent:latest", setupFiles: [], env: {} })),
     buildAgentCommand: vi.fn(() => ["echo", "test"]),
     parseEvent: vi.fn((line: string) => {
@@ -227,6 +227,23 @@ vi.mock("@optio/agent-adapters", () => ({
     inferExitCode: vi.fn(() => 0),
     parseResult: vi.fn(() => ({ summary: "Success", error: null })),
   })),
+}));
+
+vi.mock("@optio/shared", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    renderPromptTemplate: vi.fn(() => "rendered prompt"),
+    renderTaskFile: vi.fn(() => "task file content"),
+    TASK_FILE_PATH: ".optio/task.md",
+    TASK_BRANCH_PREFIX: "optio/task-",
+  };
+});
+
+vi.mock("../lib/agent/prompt-loader.js", () => ({
+  promptLoader: {
+    buildPromptFile: vi.fn().mockResolvedValue({ path: "prompt.md", content: "prompt" }),
+  },
 }));
 
 // ── Import mocked modules ──────────────────────────────────────────────────

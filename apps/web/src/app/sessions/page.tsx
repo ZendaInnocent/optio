@@ -134,45 +134,42 @@ export default function SessionsPage() {
       </div>
       {/* Create Session Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-bg-card border border-border rounded-xl p-6 max-w-lg mx-4 shadow-xl w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-sm">New Session Configuration</h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-text-muted hover:text-text transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <p className="text-xs text-text-muted">
-                Configure the agent and model for this interactive session.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <AgentSelector
-                  value={newSessionAgent}
-                  onChange={(agent) => setNewSessionAgent(agent)}
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreateModal(false)} />
+          <div className="relative z-10 w-full max-w-lg p-6 rounded-xl border border-border/50 bg-bg-card shadow-xl">
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="absolute top-4 right-4 p-1 rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-semibold mb-1">New Session Configuration</h3>
+            <p className="text-sm text-text-muted mb-4">
+              Configure the agent and model for this interactive session.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <AgentSelector
+                value={newSessionAgent}
+                onChange={(agent) => setNewSessionAgent(agent)}
+              />
+              <div className="relative">
+                <ModelSelector
+                  value={newSessionModel}
+                  onChange={(model) => setNewSessionModel(model)}
                 />
-                <div className="relative">
-                  <ModelSelector
-                    value={newSessionModel}
-                    onChange={(model) => setNewSessionModel(model)}
-                  />
-                </div>
               </div>
             </div>
             <div className="flex items-center gap-2 mt-6 justify-end">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 rounded-lg text-xs font-medium bg-bg border border-border text-text-muted hover:text-text transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-bg border border-border text-text-muted hover:text-text hover:bg-bg-hover transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmCreate}
                 disabled={creating}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
               >
                 {creating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

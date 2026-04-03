@@ -120,7 +120,7 @@ export class OpencodeAdapter implements AgentAdapter {
 
     return [
       `echo "[optio] Running OpenCode..."`,
-      `opencode run ${JSON.stringify(prompt)} --format json`,
+      `opencode run ${JSON.stringify(prompt)} --format json 2>&1`,
     ];
   }
 
@@ -198,6 +198,10 @@ export class OpencodeAdapter implements AgentAdapter {
             content: formatOpencodeToolUse(block.name, block.input),
             metadata: { toolName: block.name, toolInput: block.input, toolUseId: block.id },
           });
+        } else {
+          // Unknown content block type — capture as text
+          const blockContent = JSON.stringify(block).slice(0, 500);
+          entries.push({ taskId, timestamp, sessionId, type: "text", content: blockContent });
         }
       }
       return { entries, sessionId };
@@ -278,7 +282,10 @@ export class OpencodeAdapter implements AgentAdapter {
       return { entries, sessionId };
     }
 
-    return { entries: [], sessionId };
+    // Unknown JSON event — capture as text so nothing is silently dropped
+    const unknownContent = JSON.stringify(event).slice(0, 500);
+    entries.push({ taskId, timestamp, sessionId, type: "text", content: unknownContent });
+    return { entries, sessionId };
   }
 
   parseResult(exitCode: number, logs: string): AgentResult {

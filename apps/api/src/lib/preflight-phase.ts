@@ -6,7 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { getDependencies, areDependenciesMet } from "../services/dependency-service.js";
 import { checkExistingPr } from "../services/pr-detection-service.js";
 import { validateRequiredSecrets } from "../services/secret-service.js";
-import { getAgentConfig } from "@optio/agent-adapters";
+import { getAdapter } from "@optio/agent-adapters";
 
 export interface PreflightResult {
   shouldProceed: boolean;
@@ -109,15 +109,18 @@ export async function runPreflight(ctx: TaskContext): Promise<PreflightResult> {
   }
 
   // ── Secret validation ─────────────────────────────────────────────
-  const agentConfig = getAgentConfig(task.agentType);
-  if (agentConfig.requiredSecrets.length > 0) {
+  // Use the adapter's validateSecrets to check which secrets are required
+  const adapter = getAdapter(task.agentType);
+  const availableSecrets: string[] = [];
+  const validation = adapter.validateSecrets(availableSecrets);
+  if (validation.missing.length > 0) {
     const missingSecrets = await validateRequiredSecrets(
-      agentConfig.requiredSecrets,
+      validation.missing,
       task.repoUrl,
       task.workspaceId,
     );
     if (missingSecrets.length > 0) {
-      log.error({ missingSecrets }, "Required secrets missing");
+      log.error("Required secrets missing", missingSecrets);
       return {
         shouldProceed: false,
         requeue: false,

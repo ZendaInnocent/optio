@@ -105,6 +105,10 @@ export function parseOpencodeEvent(
             toolUseId: block.id,
           },
         });
+      } else {
+        // Unknown content block type — capture as text
+        const blockContent = JSON.stringify(block).slice(0, 500);
+        entries.push({ taskId, timestamp, sessionId, type: "text", content: blockContent });
       }
     }
     return { entries, sessionId };
@@ -200,8 +204,10 @@ export function parseOpencodeEvent(
     return { entries, sessionId };
   }
 
-  // Unknown JSON event — skip
-  return { entries: [], sessionId };
+  // Unknown JSON event — capture as text so nothing is silently dropped
+  const unknownContent = JSON.stringify(event).slice(0, 500);
+  entries.push({ taskId, timestamp, sessionId, type: "text", content: unknownContent });
+  return { entries, sessionId };
 }
 
 /** Format a tool use into a concise human-readable string */
