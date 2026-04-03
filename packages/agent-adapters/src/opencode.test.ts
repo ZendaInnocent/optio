@@ -84,40 +84,33 @@ describe("OpencodeAdapter", () => {
       expect(config.env.OPTIO_BRANCH_NAME).toBe("optio/task-test-123");
     });
 
-    it("requires GITHUB_TOKEN and OPENCODE_API_KEY when no model specified", () => {
+    it("requires only GITHUB_TOKEN when no model specified", () => {
       const config = adapter.buildContainerConfig(baseInput);
-      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN", "OPENCODE_API_KEY"]);
+      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN"]);
     });
 
-    it("requires ANTHROPIC_API_KEY when model starts with anthropic/", () => {
+    it("requires only GITHUB_TOKEN regardless of model provider", () => {
       const config = adapter.buildContainerConfig({
         ...baseInput,
         opencodeModel: "anthropic/claude-sonnet-4-20250514",
       });
-      expect(config.requiredSecrets).toContain("GITHUB_TOKEN");
-      expect(config.requiredSecrets).toContain("ANTHROPIC_API_KEY");
-      expect(config.requiredSecrets).not.toContain("OPENAI_API_KEY");
-      expect(config.requiredSecrets).not.toContain("OPENCODE_API_KEY");
+      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN"]);
     });
 
-    it("requires OPENAI_API_KEY when model starts with openai/", () => {
+    it("requires only GITHUB_TOKEN for OpenAI models", () => {
       const config = adapter.buildContainerConfig({
         ...baseInput,
         opencodeModel: "openai/gpt-4.1",
       });
-      expect(config.requiredSecrets).toContain("GITHUB_TOKEN");
-      expect(config.requiredSecrets).toContain("OPENAI_API_KEY");
-      expect(config.requiredSecrets).not.toContain("ANTHROPIC_API_KEY");
-      expect(config.requiredSecrets).not.toContain("OPENCODE_API_KEY");
+      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN"]);
     });
 
-    it("requires OPENCODE_API_KEY for unknown model", () => {
+    it("requires only GITHUB_TOKEN for unknown model", () => {
       const config = adapter.buildContainerConfig({
         ...baseInput,
         opencodeModel: "custom/model",
       });
-      expect(config.requiredSecrets).toContain("GITHUB_TOKEN");
-      expect(config.requiredSecrets).toContain("OPENCODE_API_KEY");
+      expect(config.requiredSecrets).toEqual(["GITHUB_TOKEN"]);
     });
 
     it("creates opencode.json config file when model is set", () => {
@@ -282,6 +275,55 @@ describe("OpencodeAdapter", () => {
       const result = adapter.getExecCommand("test prompt");
 
       expect(result.args[1]).toContain("--format json");
+    });
+  });
+
+  describe("buildAgentCommand", () => {
+    it("returns opencode run command with --format json", () => {
+      const result = adapter.buildAgentCommand({ OPTIO_PROMPT: "Fix the bug" });
+
+      expect(result.some((line) => line.includes("opencode run"))).toBe(true);
+      expect(result.some((line) => line.includes("--format json"))).toBe(true);
+    });
+
+    it("includes prompt in command", () => {
+      const result = adapter.buildAgentCommand({ OPTIO_PROMPT: "Fix the bug" });
+      const opencodeLine = result.find((line) => line.includes("opencode run"));
+      expect(opencodeLine).toContain("Fix the bug");
+    });
+
+    it("prepends resume prompt with original prompt", () => {
+      const result = adapter.buildAgentCommand(
+        { OPTIO_PROMPT: "Original task" },
+        { resumePrompt: "CI failed" },
+      );
+      const opencodeLine = result.find((line) => line.includes("opencode run"));
+      expect(opencodeLine).toContain("CI failed");
+      expect(opencodeLine).toContain("Original task prompt for context");
+    });
+  });
+
+  describe("inferExitCode", () => {
+    it("returns 0 for clean output", () => {
+      expect(adapter.inferExitCode("some normal output")).toBe(0);
+    });
+
+    it("returns 1 when is_error is true in logs", () => {
+      expect(adapter.inferExitCode('{"type":"result","is_error":true}')).toBe(1);
+    });
+
+    it("returns 1 for fatal errors", () => {
+      expect(adapter.inferExitCode("fatal: something went wrong")).toBe(1);
+    });
+
+    it("returns 1 for authentication_failed", () => {
+      expect(adapter.inferExitCode("Error: authentication_failed")).toBe(1);
+    });
+
+    it("returns 0 for successful output with PR link", () => {
+      expect(adapter.inferExitCode("Working...\nhttps://github.com/org/repo/pull/42\nDone")).toBe(
+        0,
+      );
     });
   });
 });

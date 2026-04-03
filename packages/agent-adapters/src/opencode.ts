@@ -1,6 +1,17 @@
-import type { AgentTaskInput, AgentContainerConfig, AgentResult } from "@optio/shared";
+import type {
+  AgentTaskInput,
+  AgentContainerConfig,
+  AgentResult,
+  AgentLogEntry,
+} from "@optio/shared";
 import { TASK_BRANCH_PREFIX } from "@optio/shared";
-import type { AgentAdapter, AgentExecCommand } from "./types.js";
+import type {
+  AgentAdapter,
+  AgentExecCommand,
+  AgentCommandOptions,
+  AgentEventParseResult,
+} from "./types.js";
+import { isRawTextError, buildPrompt, truncate } from "./shared-utils.js";
 
 /** OpenCode model pricing (USD per 1M tokens) */
 const OPENCODE_MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -53,7 +64,7 @@ export class OpencodeAdapter implements AgentAdapter {
   }
 
   buildContainerConfig(input: AgentTaskInput): AgentContainerConfig {
-    const prompt = input.renderedPrompt ?? this.buildPrompt(input);
+    const prompt = input.renderedPrompt ?? buildPrompt(input);
 
     const env: Record<string, string> = {
       OPTIO_TASK_ID: input.taskId,
@@ -100,6 +111,174 @@ export class OpencodeAdapter implements AgentAdapter {
       requiredSecrets,
       setupFiles,
     };
+  }
+
+  buildAgentCommand(env: Record<string, string>, opts?: AgentCommandOptions): string[] {
+    const prompt = opts?.resumePrompt
+      ? `${opts.resumePrompt}\n\n---\n\nOriginal task prompt for context:\n${env.OPTIO_PROMPT}`
+      : env.OPTIO_PROMPT;
+
+    return [
+      `echo "[optio] Running OpenCode..."`,
+      `opencode run ${JSON.stringify(prompt)} --format json`,
+    ];
+  }
+
+  inferExitCode(logs: string): number {
+    const hasResultError = logs.includes('"is_error":true');
+    const hasFatalError =
+      logs.includes("fatal:") ||
+      logs.includes("Error: authentication_failed") ||
+      logs.includes("exit 1");
+    return hasResultError || hasFatalError ? 1 : 0;
+  }
+
+  parseEvent(line: string, taskId: string): AgentEventParseResult {
+    let jsonStr = line;
+    if (line.startsWith("data:")) {
+      jsonStr = line.slice(5).trim();
+    }
+
+    let event: any;
+    try {
+      event = JSON.parse(jsonStr);
+    } catch {
+      if (!line.trim()) return { entries: [] };
+      const clean = line.replace(/\x1b\[[0-9;]*[a-zA-Z]|\r/g, "").trim();
+      if (!clean || clean.length < 2) return { entries: [] };
+      const prMatch = clean.match(/https:\/\/github\.com\/[^\s"]+\/pull\/\d+/);
+      const content = prMatch ? clean.replace(prMatch[0], `\uD83D\uDD17 ${prMatch[0]}`) : clean;
+      return {
+        entries: [{ taskId, timestamp: new Date().toISOString(), type: "text", content }],
+      };
+    }
+
+    const sessionId = event.session_id ?? event.id ?? (event.conversation_id as string | undefined);
+    const timestamp = new Date().toISOString();
+    const entries: AgentLogEntry[] = [];
+
+    if (event.type === "system" && event.subtype === "init") {
+      const toolCount = Array.isArray(event.tools) ? event.tools.length : 0;
+      entries.push({
+        taskId,
+        timestamp,
+        sessionId,
+        type: "system",
+        content: `Session started \u00b7 ${event.model ?? "unknown"} \u00b7 ${toolCount} tools`,
+        metadata: { model: event.model },
+      });
+      return { entries, sessionId };
+    }
+
+    if (event.type === "system") {
+      let msg = "";
+      if (event.subtype) {
+        msg = `[${event.subtype}] ${event.message ?? event.error ?? ""}`.trim();
+      } else if (event.message || event.error) {
+        msg = event.message ?? event.error ?? "";
+      }
+      if (msg) {
+        entries.push({ taskId, timestamp, sessionId, type: "system", content: msg });
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.type === "assistant" && event.message?.content) {
+      for (const block of event.message.content) {
+        if (block.type === "thinking" && block.thinking) {
+          entries.push({ taskId, timestamp, sessionId, type: "thinking", content: block.thinking });
+        } else if (block.type === "text" && block.text) {
+          entries.push({ taskId, timestamp, sessionId, type: "text", content: block.text });
+        } else if (block.type === "tool_use") {
+          entries.push({
+            taskId,
+            timestamp,
+            sessionId,
+            type: "tool_use",
+            content: formatOpencodeToolUse(block.name, block.input),
+            metadata: { toolName: block.name, toolInput: block.input, toolUseId: block.id },
+          });
+        }
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.type === "user" && event.message?.content) {
+      for (const block of event.message.content) {
+        if (block.type === "tool_result") {
+          const raw =
+            typeof block.content === "string"
+              ? block.content
+              : Array.isArray(block.content)
+                ? block.content.map((c: any) => c.text ?? c.content ?? "").join("")
+                : "";
+          const trimmed = raw.length > 300 ? raw.slice(0, 300) + "\u2026" : raw;
+          if (trimmed.trim()) {
+            entries.push({ taskId, timestamp, sessionId, type: "tool_result", content: trimmed });
+          }
+        }
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.type === "result") {
+      const parts: string[] = [];
+      if (event.result) parts.push(event.result);
+      const meta: string[] = [];
+      if (event.num_turns) meta.push(`${event.num_turns} turns`);
+      if (event.duration_ms) meta.push(`${(event.duration_ms / 1000).toFixed(1)}s`);
+      if (event.total_cost_usd) meta.push(`$${event.total_cost_usd.toFixed(4)}`);
+      if (meta.length) parts.push(`(${meta.join(" \u00b7 ")})`);
+
+      entries.push({
+        taskId,
+        timestamp,
+        sessionId,
+        type: "info",
+        content: parts.join(" "),
+        metadata: {
+          cost: event.total_cost_usd,
+          turns: event.num_turns,
+          durationMs: event.duration_ms,
+        },
+      });
+      return { entries, sessionId };
+    }
+
+    if (event.type === "error") {
+      const msg = [event.error, event.message].filter(Boolean).join(": ");
+      entries.push({
+        taskId,
+        timestamp,
+        sessionId,
+        type: "error",
+        content: msg || JSON.stringify(event),
+      });
+      return { entries, sessionId };
+    }
+
+    if (event.usage || event.total_cost_usd) {
+      const usage = event.usage ?? {};
+      const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? 0;
+      const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? 0;
+      const meta: string[] = [];
+      if (inputTokens) meta.push(`${inputTokens} input tokens`);
+      if (outputTokens) meta.push(`${outputTokens} output tokens`);
+      if (event.total_cost_usd) meta.push(`$${event.total_cost_usd.toFixed(4)}`);
+      if (meta.length) {
+        entries.push({
+          taskId,
+          timestamp,
+          sessionId,
+          type: "info",
+          content: `Usage: ${meta.join(" \u00b7 ")}`,
+          metadata: { inputTokens, outputTokens, cost: event.total_cost_usd },
+        });
+      }
+      return { entries, sessionId };
+    }
+
+    return { entries: [], sessionId };
   }
 
   parseResult(exitCode: number, logs: string): AgentResult {
@@ -169,51 +348,30 @@ export class OpencodeAdapter implements AgentAdapter {
       error,
     };
   }
-
-  /** Build a fallback prompt when renderedPrompt is not provided */
-  private buildPrompt(input: AgentTaskInput): string {
-    const parts = [input.prompt, "", "Instructions:", "- Work on the task described above."];
-    if (input.taskFilePath) {
-      parts.push(`- Read the task file at ${input.taskFilePath} for full details.`);
-    }
-    parts.push(
-      "- When you are done, create a pull request using the gh CLI.",
-      `- Use branch name: ${TASK_BRANCH_PREFIX}${input.taskId}`,
-      "- Write a clear PR title and description summarizing your changes.",
-    );
-    if (input.additionalContext) {
-      parts.push("", "Additional context:", input.additionalContext);
-    }
-    return parts.join("\n");
-  }
 }
 
-/** Detect common OpenCode error patterns in non-JSON output lines */
-function isRawTextError(line: string): boolean {
-  // Auth / API key errors
-  if (
-    /error|failed|fatal/i.test(line) &&
-    /OPENCODE_API_KEY|ANTHROPIC_API_KEY|OPENAI_API_KEY|authentication|unauthorized|quota/i.test(
-      line,
-    )
-  ) {
-    return true;
+function formatOpencodeToolUse(name: string, input: any): string {
+  if (!input) return name;
+  switch (name) {
+    case "Read":
+      return `Read ${input.file_path ?? input.path ?? ""}`;
+    case "Write":
+      return `Write ${input.file_path ?? input.path ?? ""}`;
+    case "Edit":
+      return `Edit ${input.file_path ?? input.path ?? ""}`;
+    case "Bash":
+      return `$ ${(input.command ?? input.cmd ?? "").split("\n")[0].slice(0, 120)}`;
+    case "Glob":
+      return `Glob ${input.pattern ?? ""}${input.path ? ` in ${input.path}` : ""}`;
+    case "Grep":
+      return `Grep "${input.pattern ?? ""}"${input.path ? ` in ${input.path}` : ""}`;
+    case "WebSearch":
+      return `Search: ${input.query ?? ""}`;
+    case "WebFetch":
+      return `Fetch: ${input.url ?? ""}`;
+    case "Agent":
+      return `Agent: ${input.description ?? ""}`;
+    default:
+      return name;
   }
-  // Model not found
-  if (/model.*not found|model_not_found|does not exist|invalid.*model/i.test(line)) {
-    return true;
-  }
-  // Context length exceeded
-  if (/context.?length|maximum.?context|token.?limit|too many tokens/i.test(line)) {
-    return true;
-  }
-  // Content filter / safety
-  if (/content.?filter|content.?policy|safety.?system|flagged/i.test(line)) {
-    return true;
-  }
-  // Server errors
-  if (/server.?error|internal.?error|service.?unavailable|503|502/i.test(line)) {
-    return true;
-  }
-  return false;
 }

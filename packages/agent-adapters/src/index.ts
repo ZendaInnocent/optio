@@ -1,4 +1,4 @@
-export type { AgentAdapter } from "./types.js";
+export type { AgentAdapter, AgentCommandOptions, AgentEventParseResult } from "./types.js";
 export { ClaudeCodeAdapter } from "./claude-code.js";
 export { CodexAdapter } from "./codex.js";
 export { OpencodeAdapter } from "./opencode.js";

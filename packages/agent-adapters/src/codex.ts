@@ -2,10 +2,17 @@ import type {
   AgentTaskInput,
   AgentContainerConfig,
   AgentResult,
+  AgentLogEntry,
   CodexAuthMode,
 } from "@optio/shared";
 import { TASK_BRANCH_PREFIX } from "@optio/shared";
-import type { AgentAdapter, AgentExecCommand } from "./types.js";
+import type {
+  AgentAdapter,
+  AgentExecCommand,
+  AgentCommandOptions,
+  AgentEventParseResult,
+} from "./types.js";
+import { isRawTextError, buildPrompt, truncate } from "./shared-utils.js";
 
 /**
  * Codex CLI (codex exec --full-auto --json) outputs NDJSON events.
@@ -40,8 +47,9 @@ export class CodexAdapter implements AgentAdapter {
 
   validateSecrets(
     availableSecrets: string[],
-    codexAuthMode?: CodexAuthMode,
+    agentConfig?: Record<string, unknown>,
   ): { valid: boolean; missing: string[] } {
+    const codexAuthMode = agentConfig?.codexAuthMode as CodexAuthMode | undefined;
     const required: string[] = ["GITHUB_TOKEN"];
     if (codexAuthMode !== "app-server") {
       required.push("OPENAI_API_KEY");
@@ -72,7 +80,7 @@ export class CodexAdapter implements AgentAdapter {
 
   buildContainerConfig(input: AgentTaskInput): AgentContainerConfig {
     // Use the pre-rendered prompt from the template system, or fall back to raw prompt
-    const prompt = input.renderedPrompt ?? this.buildPrompt(input);
+    const prompt = input.renderedPrompt ?? buildPrompt(input);
 
     const env: Record<string, string> = {
       OPTIO_TASK_ID: input.taskId,
@@ -111,6 +119,173 @@ export class CodexAdapter implements AgentAdapter {
       requiredSecrets,
       setupFiles,
     };
+  }
+
+  buildAgentCommand(env: Record<string, string>, opts?: AgentCommandOptions): string[] {
+    const prompt = opts?.resumePrompt
+      ? `${opts.resumePrompt}\n\n---\n\nOriginal task prompt for context:\n${env.OPTIO_PROMPT}`
+      : env.OPTIO_PROMPT;
+
+    const appServerFlag =
+      env.OPTIO_CODEX_AUTH_MODE === "app-server" && env.OPTIO_CODEX_APP_SERVER_URL
+        ? ` --app-server ${JSON.stringify(env.OPTIO_CODEX_APP_SERVER_URL)}`
+        : "";
+    return [
+      `echo "[optio] Running OpenAI Codex${appServerFlag ? " (app-server)" : ""}..."`,
+      `codex exec --full-auto ${JSON.stringify(prompt)}${appServerFlag} --json`,
+    ];
+  }
+
+  inferExitCode(logs: string): number {
+    const hasErrorEvent = logs.includes('"type":"error"') || logs.includes('"type": "error"');
+    const hasApiErrorEnvelope = /"error"\s*:\s*\{\s*"message"/.test(logs);
+    const hasAuthError =
+      /OPENAI_API_KEY|invalid.*api.?key|unauthorized|authentication.*failed/i.test(logs);
+    const hasQuotaError = /quota|insufficient_quota|billing/i.test(logs);
+    const hasModelError = /model_not_found|model.*not found|does not exist.*model/i.test(logs);
+    const hasContentFilter = /content.?filter|content.?policy|safety.?system/i.test(logs);
+    return hasErrorEvent ||
+      hasApiErrorEnvelope ||
+      hasAuthError ||
+      hasQuotaError ||
+      hasModelError ||
+      hasContentFilter
+      ? 1
+      : 0;
+  }
+
+  parseEvent(line: string, taskId: string): AgentEventParseResult {
+    let event: any;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      if (!line.trim()) return { entries: [] };
+      const clean = line.replace(/\x1b\[[0-9;]*[a-zA-Z]|\r/g, "").trim();
+      if (!clean || clean.length < 2) return { entries: [] };
+      return {
+        entries: [{ taskId, timestamp: new Date().toISOString(), type: "text", content: clean }],
+      };
+    }
+
+    const timestamp = new Date().toISOString();
+    const entries: AgentLogEntry[] = [];
+    const sessionId = (event.id ?? event.session_id ?? event.conversation_id) as string | undefined;
+
+    if (event.type === "message" && event.role === "system") {
+      const content =
+        typeof event.content === "string" ? event.content : JSON.stringify(event.content);
+      if (content?.trim()) {
+        entries.push({ taskId, timestamp, sessionId, type: "system", content });
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.type === "message" && event.role === "assistant") {
+      const content =
+        typeof event.content === "string"
+          ? event.content
+          : Array.isArray(event.content)
+            ? event.content
+                .map((block: any) => {
+                  if (typeof block === "string") return block;
+                  if (block.type === "text") return block.text;
+                  if (block.type === "output_text") return block.text;
+                  return "";
+                })
+                .filter(Boolean)
+                .join("\n")
+            : "";
+      if (content?.trim()) {
+        entries.push({ taskId, timestamp, sessionId, type: "text", content });
+      }
+
+      const usage = event.usage ?? event.response?.usage;
+      if (usage) {
+        const meta: string[] = [];
+        const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? 0;
+        const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? 0;
+        if (inputTokens) meta.push(`${inputTokens} input tokens`);
+        if (outputTokens) meta.push(`${outputTokens} output tokens`);
+        if (event.total_cost_usd) meta.push(`$${event.total_cost_usd.toFixed(4)}`);
+        if (meta.length) {
+          entries.push({
+            taskId,
+            timestamp,
+            sessionId,
+            type: "info",
+            content: `Usage: ${meta.join(" \u00b7 ")}`,
+            metadata: { inputTokens, outputTokens, cost: event.total_cost_usd },
+          });
+        }
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.type === "function_call") {
+      const args = parseCodexArgs(event.arguments);
+      entries.push({
+        taskId,
+        timestamp,
+        sessionId,
+        type: "tool_use",
+        content: formatCodexToolUse(event.name, args),
+        metadata: { toolName: event.name, toolInput: args, toolUseId: event.call_id },
+      });
+      return { entries, sessionId };
+    }
+
+    if (event.type === "function_call_output") {
+      const output = typeof event.output === "string" ? event.output : JSON.stringify(event.output);
+      const trimmed = output.length > 300 ? output.slice(0, 300) + "\u2026" : output;
+      if (trimmed.trim()) {
+        entries.push({
+          taskId,
+          timestamp,
+          sessionId,
+          type: "tool_result",
+          content: trimmed,
+          metadata: { toolUseId: event.call_id },
+        });
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.type === "error") {
+      const msg = event.message ?? event.error ?? JSON.stringify(event);
+      entries.push({ taskId, timestamp, sessionId, type: "error", content: msg });
+      return { entries, sessionId };
+    }
+
+    if (event.type === "reasoning") {
+      const content = typeof event.content === "string" ? event.content : "";
+      if (content.trim()) {
+        entries.push({ taskId, timestamp, sessionId, type: "thinking", content });
+      }
+      return { entries, sessionId };
+    }
+
+    if (event.usage || event.response?.usage) {
+      const usage = event.usage ?? event.response.usage;
+      const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? 0;
+      const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? 0;
+      const meta: string[] = [];
+      if (inputTokens) meta.push(`${inputTokens} input tokens`);
+      if (outputTokens) meta.push(`${outputTokens} output tokens`);
+      if (event.total_cost_usd) meta.push(`$${event.total_cost_usd.toFixed(4)}`);
+      if (meta.length) {
+        entries.push({
+          taskId,
+          timestamp,
+          sessionId,
+          type: "info",
+          content: `Usage: ${meta.join(" \u00b7 ")}`,
+          metadata: { inputTokens, outputTokens, cost: event.total_cost_usd },
+        });
+      }
+      return { entries, sessionId };
+    }
+
+    return { entries: [], sessionId };
   }
 
   parseResult(exitCode: number, logs: string): AgentResult {
@@ -230,53 +405,49 @@ export class CodexAdapter implements AgentAdapter {
       summary: lastAssistantMessage ? truncate(lastAssistantMessage, 200) : undefined,
     };
   }
-
-  private buildPrompt(input: AgentTaskInput): string {
-    const parts = [input.prompt, "", "Instructions:", "- Work on the task described above."];
-    if (input.taskFilePath) {
-      parts.push(`- Read the task file at ${input.taskFilePath} for full details.`);
-    }
-    parts.push(
-      "- When you are done, create a pull request using the gh CLI.",
-      `- Use branch name: ${TASK_BRANCH_PREFIX}${input.taskId}`,
-      "- Write a clear PR title and description summarizing your changes.",
-    );
-    if (input.additionalContext) {
-      parts.push("", "Additional context:", input.additionalContext);
-    }
-    return parts.join("\n");
-  }
 }
 
-function truncate(s: string, maxLen: number): string {
-  if (s.length <= maxLen) return s;
-  return s.slice(0, maxLen) + "\u2026";
+function parseCodexArgs(args: unknown): Record<string, unknown> | undefined {
+  if (!args) return undefined;
+  if (typeof args === "object") return args as Record<string, unknown>;
+  if (typeof args === "string") {
+    try {
+      return JSON.parse(args);
+    } catch {
+      return { raw: args };
+    }
+  }
+  return undefined;
 }
 
-/** Detect common Codex/OpenAI error patterns in non-JSON output lines */
-function isRawTextError(line: string): boolean {
-  // Auth / API key errors
-  if (
-    /error|failed|fatal/i.test(line) &&
-    /OPENAI_API_KEY|api\.openai\.com|authentication|unauthorized|quota/i.test(line)
-  ) {
-    return true;
+function formatCodexToolUse(name: string, args: Record<string, unknown> | undefined): string {
+  if (!name) return "unknown tool";
+  if (!args) return name;
+  switch (name) {
+    case "shell":
+    case "bash":
+    case "terminal":
+      return `$ ${String(args.command ?? args.cmd ?? "")
+        .split("\n")[0]
+        .slice(0, 120)}`;
+    case "read_file":
+    case "readFile":
+      return `Read ${args.path ?? args.file_path ?? ""}`;
+    case "write_file":
+    case "writeFile":
+    case "create_file":
+      return `Write ${args.path ?? args.file_path ?? ""}`;
+    case "edit_file":
+    case "editFile":
+    case "apply_diff":
+      return `Edit ${args.path ?? args.file_path ?? ""}`;
+    case "search":
+    case "grep":
+      return `Search: ${args.query ?? args.pattern ?? ""}`;
+    case "list_dir":
+    case "listDir":
+      return `List ${args.path ?? args.dir ?? "."}`;
+    default:
+      return name;
   }
-  // Model not found
-  if (/model.*not found|model_not_found|does not exist|invalid.*model/i.test(line)) {
-    return true;
-  }
-  // Context length exceeded
-  if (/context.?length|maximum.?context|token.?limit|too many tokens/i.test(line)) {
-    return true;
-  }
-  // Content filter / safety
-  if (/content.?filter|content.?policy|safety.?system|flagged/i.test(line)) {
-    return true;
-  }
-  // Server errors
-  if (/server.?error|internal.?error|service.?unavailable|503|502/i.test(line)) {
-    return true;
-  }
-  return false;
 }

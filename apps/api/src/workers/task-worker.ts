@@ -5,15 +5,10 @@ import {
   renderPromptTemplate,
   renderTaskFile,
   TASK_FILE_PATH,
-  DEFAULT_MAX_TURNS_CODING,
-  DEFAULT_MAX_TURNS_REVIEW,
   type PresetImageId,
   msUntilOffPeak,
 } from "@optio/shared";
 import { getAdapter } from "@optio/agent-adapters";
-import { parseClaudeEvent } from "../services/agent-event-parser.js";
-import { parseCodexEvent } from "../services/codex-event-parser.js";
-import { parseOpencodeEvent } from "../services/opencode-event-parser.js";
 import { checkExistingPr } from "../services/pr-detection-service.js";
 import { db } from "../db/client.js";
 import { tasks } from "../db/schema.js";
@@ -456,7 +451,7 @@ export function startTaskWorker() {
 
         // Build the agent command based on type
         const isReviewTask = !!reviewOverride || task.taskType === "review";
-        const agentCommand = buildAgentCommand(task.agentType, allEnv, {
+        const agentCommand = adapter.buildAgentCommand(allEnv, {
           resumeSessionId,
           resumePrompt,
           isReview: isReviewTask,
@@ -498,12 +493,7 @@ export function startTaskWorker() {
             if (!line.trim()) continue;
 
             // Parse as structured agent event (format depends on agent type)
-            const parsed =
-              task.agentType === "codex"
-                ? parseCodexEvent(line, taskId)
-                : task.agentType === "opencode"
-                  ? parseOpencodeEvent(line, taskId)
-                  : parseClaudeEvent(line, taskId);
+            const parsed = adapter.parseEvent(line, taskId);
             if (parsed.sessionId && !sessionId) {
               sessionId = parsed.sessionId;
               await taskService.updateTaskSession(taskId, sessionId);
@@ -574,7 +564,7 @@ export function startTaskWorker() {
         }
 
         // Detect exit code from logs (agent-type-specific patterns)
-        const inferredExitCode = inferExitCode(task.agentType, allLogs);
+        const inferredExitCode = adapter.inferExitCode(allLogs);
         const result = adapter.parseResult(inferredExitCode, allLogs);
         await taskService.updateTaskResult(taskId, result.summary, result.error);
 
@@ -936,98 +926,6 @@ export async function reconcileOrphanedTasks() {
     }
     if (unblocked > 0) {
       logger.info({ unblocked }, "Unblocked waiting_on_deps tasks after startup reconciliation");
-    }
-  }
-}
-
-export function buildAgentCommand(
-  agentType: string,
-  env: Record<string, string>,
-  opts?: {
-    resumeSessionId?: string;
-    resumePrompt?: string;
-    isReview?: boolean;
-    maxTurnsCoding?: number;
-    maxTurnsReview?: number;
-  },
-): string[] {
-  const prompt = opts?.resumePrompt
-    ? `${opts.resumePrompt}\n\n---\n\nOriginal task prompt for context:\n${env.OPTIO_PROMPT}`
-    : env.OPTIO_PROMPT;
-  const maxTurns = opts?.isReview
-    ? (opts.maxTurnsReview ?? DEFAULT_MAX_TURNS_REVIEW)
-    : (opts?.maxTurnsCoding ?? DEFAULT_MAX_TURNS_CODING);
-
-  switch (agentType) {
-    case "claude-code": {
-      const authSetup =
-        env.OPTIO_AUTH_MODE === "max-subscription"
-          ? [
-              `if curl -sf "${env.OPTIO_API_URL}/api/auth/claude-token" > /dev/null 2>&1; then echo "[optio] Token proxy OK"; fi`,
-              `unset ANTHROPIC_API_KEY 2>/dev/null || true`,
-            ]
-          : [];
-
-      const resumeFlag = opts?.resumeSessionId
-        ? `--resume ${JSON.stringify(opts.resumeSessionId)}`
-        : "";
-
-      return [
-        ...authSetup,
-        `echo "[optio] Running Claude Code${opts?.isReview ? " (review)" : ""}..."`,
-        `claude -p ${JSON.stringify(prompt)} \\`,
-        `  --dangerously-skip-permissions \\`,
-        `  --output-format stream-json \\`,
-        `  --verbose \\`,
-        `  --max-turns ${maxTurns} \\`,
-        `  ${resumeFlag}`.trim(),
-      ];
-    }
-    case "codex": {
-      const appServerFlag =
-        env.OPTIO_CODEX_AUTH_MODE === "app-server" && env.OPTIO_CODEX_APP_SERVER_URL
-          ? ` --app-server ${JSON.stringify(env.OPTIO_CODEX_APP_SERVER_URL)}`
-          : "";
-      return [
-        `echo "[optio] Running OpenAI Codex${appServerFlag ? " (app-server)" : ""}..."`,
-        `codex exec --full-auto ${JSON.stringify(prompt)}${appServerFlag} --json`,
-      ];
-    }
-    default:
-      return [`echo "Unknown agent type: ${agentType}" && exit 1`];
-  }
-}
-
-/** Infer exit code from agent logs based on agent-specific error patterns */
-export function inferExitCode(agentType: string, logs: string): number {
-  switch (agentType) {
-    case "codex": {
-      // Codex: look for error events in JSON output or OpenAI-specific failures
-      const hasErrorEvent = logs.includes('"type":"error"') || logs.includes('"type": "error"');
-      const hasApiErrorEnvelope = /"error"\s*:\s*\{\s*"message"/.test(logs);
-      const hasAuthError =
-        /OPENAI_API_KEY|invalid.*api.?key|unauthorized|authentication.*failed/i.test(logs);
-      const hasQuotaError = /quota|insufficient_quota|billing/i.test(logs);
-      const hasModelError = /model_not_found|model.*not found|does not exist.*model/i.test(logs);
-      const hasContentFilter = /content.?filter|content.?policy|safety.?system/i.test(logs);
-      return hasErrorEvent ||
-        hasApiErrorEnvelope ||
-        hasAuthError ||
-        hasQuotaError ||
-        hasModelError ||
-        hasContentFilter
-        ? 1
-        : 0;
-    }
-    case "claude-code":
-    default: {
-      // Claude: check for is_error in result event, or fatal errors
-      const hasResultError = logs.includes('"is_error":true');
-      const hasFatalError =
-        logs.includes("fatal:") ||
-        logs.includes("Error: authentication_failed") ||
-        logs.includes("exit 1");
-      return hasResultError || hasFatalError ? 1 : 0;
     }
   }
 }

@@ -1,3 +1,7 @@
+import type { AgentType } from "@optio/shared";
+
+export type { AgentType };
+
 /**
  * Configuration for generating a Dockerfile.
  */
@@ -35,8 +39,6 @@ export interface AgentDefinition {
   installCommand: string;
   requiredSecrets: string[];
 }
-
-export type AgentType = "claude-code" | "codex" | "opencode";
 
 /**
  * Thrown when the DockerfileGenerator encounters invalid configuration.

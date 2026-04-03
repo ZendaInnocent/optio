@@ -40,19 +40,19 @@ describe("CodexAdapter", () => {
     });
 
     it("does not require OPENAI_API_KEY in app-server mode", () => {
-      const result = adapter.validateSecrets(["GITHUB_TOKEN"], "app-server");
+      const result = adapter.validateSecrets(["GITHUB_TOKEN"], { codexAuthMode: "app-server" });
       expect(result.valid).toBe(true);
       expect(result.missing).toEqual([]);
     });
 
     it("still requires GITHUB_TOKEN in app-server mode", () => {
-      const result = adapter.validateSecrets([], "app-server");
+      const result = adapter.validateSecrets([], { codexAuthMode: "app-server" });
       expect(result.valid).toBe(false);
       expect(result.missing).toEqual(["GITHUB_TOKEN"]);
     });
 
     it("requires OPENAI_API_KEY in api-key mode", () => {
-      const result = adapter.validateSecrets(["GITHUB_TOKEN"], "api-key");
+      const result = adapter.validateSecrets(["GITHUB_TOKEN"], { codexAuthMode: "api-key" });
       expect(result.valid).toBe(false);
       expect(result.missing).toContain("OPENAI_API_KEY");
     });
@@ -343,6 +343,90 @@ describe("CodexAdapter", () => {
       const result = adapter.getExecCommand("test prompt");
 
       expect(result.args[1]).toContain("--json");
+    });
+  });
+
+  describe("buildAgentCommand", () => {
+    it("returns codex exec command with --full-auto and --json", () => {
+      const result = adapter.buildAgentCommand({ OPTIO_PROMPT: "Fix the bug" });
+
+      expect(result.some((line) => line.includes("codex exec"))).toBe(true);
+      expect(result.some((line) => line.includes("--full-auto"))).toBe(true);
+      expect(result.some((line) => line.includes("--json"))).toBe(true);
+    });
+
+    it("includes prompt in command", () => {
+      const result = adapter.buildAgentCommand({ OPTIO_PROMPT: "Fix the bug" });
+      const codexLine = result.find((line) => line.includes("codex exec"));
+      expect(codexLine).toContain("Fix the bug");
+    });
+
+    it("includes app-server flag when configured", () => {
+      const result = adapter.buildAgentCommand({
+        OPTIO_PROMPT: "Fix",
+        OPTIO_CODEX_AUTH_MODE: "app-server",
+        OPTIO_CODEX_APP_SERVER_URL: "ws://localhost:3900/v1/connect",
+      });
+      const codexLine = result.find((line) => line.includes("codex exec"));
+      expect(codexLine).toContain("--app-server");
+      expect(codexLine).toContain("ws://localhost:3900/v1/connect");
+    });
+
+    it("does not include app-server flag in api-key mode", () => {
+      const result = adapter.buildAgentCommand({
+        OPTIO_PROMPT: "Fix",
+        OPTIO_CODEX_AUTH_MODE: "api-key",
+      });
+      const codexLine = result.find((line) => line.includes("codex exec"));
+      expect(codexLine).not.toContain("--app-server");
+    });
+
+    it("prepends resume prompt with original prompt", () => {
+      const result = adapter.buildAgentCommand(
+        { OPTIO_PROMPT: "Original task" },
+        { resumePrompt: "CI failed" },
+      );
+      const codexLine = result.find((line) => line.includes("codex exec"));
+      expect(codexLine).toContain("CI failed");
+      expect(codexLine).toContain("Original task prompt for context");
+    });
+  });
+
+  describe("inferExitCode", () => {
+    it("returns 0 for clean output", () => {
+      expect(adapter.inferExitCode("some normal output")).toBe(0);
+    });
+
+    it("returns 1 for error events", () => {
+      expect(adapter.inferExitCode('{"type":"error","message":"failed"}')).toBe(1);
+    });
+
+    it("returns 1 for API error envelope", () => {
+      expect(
+        adapter.inferExitCode('{"error":{"message":"rate limited","type":"rate_limit"}}'),
+      ).toBe(1);
+    });
+
+    it("returns 1 for auth errors", () => {
+      expect(adapter.inferExitCode("OPENAI_API_KEY is not set")).toBe(1);
+    });
+
+    it("returns 1 for quota errors", () => {
+      expect(adapter.inferExitCode("Error: insufficient_quota")).toBe(1);
+    });
+
+    it("returns 1 for model not found", () => {
+      expect(adapter.inferExitCode("model_not_found: model does not exist")).toBe(1);
+    });
+
+    it("returns 1 for content filter", () => {
+      expect(adapter.inferExitCode("content_filter triggered")).toBe(1);
+    });
+
+    it("returns 0 for successful output with PR link", () => {
+      expect(adapter.inferExitCode("Working...\nhttps://github.com/org/repo/pull/42\nDone")).toBe(
+        0,
+      );
     });
   });
 });

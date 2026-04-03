@@ -6,7 +6,6 @@ import { db } from "../db/client.js";
 import { repoPods, repos, interactiveSessions } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { logger } from "../logger.js";
-import { parseClaudeEvent } from "../services/agent-event-parser.js";
 import { publishSessionEvent } from "../services/event-bus.js";
 import {
   addSessionMessage,
@@ -218,7 +217,7 @@ export async function sessionChatWs(app: FastifyInstance) {
 
           for (const line of lines) {
             if (!line.trim()) continue;
-            const { entries } = parseClaudeEvent(line, sessionId);
+            const { entries } = adapter.parseEvent(line, sessionId);
             for (const entry of entries) {
               send({ type: "chat_event", event: entry });
 
@@ -261,7 +260,7 @@ export async function sessionChatWs(app: FastifyInstance) {
           execSession!.stdout.on("end", () => {
             // Process any remaining buffer
             if (outputBuffer.trim()) {
-              const { entries } = parseClaudeEvent(outputBuffer, sessionId);
+              const { entries } = adapter.parseEvent(outputBuffer, sessionId);
               for (const entry of entries) {
                 send({ type: "chat_event", event: entry });
 
