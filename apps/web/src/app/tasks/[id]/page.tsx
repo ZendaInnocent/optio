@@ -29,6 +29,7 @@ import {
   Key,
   Check,
   Copy,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useOptioChatStore } from "@/hooks/use-optio-chat";
@@ -163,9 +164,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-text-muted">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Loading task...
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-text-muted">
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Loading task details...</span>
+        </div>
+        <p className="text-xs text-text-muted/60">
+          Fetching task configuration, pipeline status, and activity
+        </p>
       </div>
     );
   }
@@ -189,108 +195,108 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   // (log filtering is handled by LogViewer component)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="p-6 max-w-5xl mx-auto space-y-4">
       {/* Header */}
-      <div className="shrink-0 p-4 border-b border-border bg-bg-card">
-        <div className="flex flex-col gap-3 max-w-5xl mx-auto">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-lg font-bold tracking-tight">{task.title}</h1>
-                <StateBadge state={task.state} />
-              </div>
-              <div className="flex items-center gap-4 mt-2 text-xs text-text-muted flex-wrap">
-                <span className="flex items-center gap-1">
-                  <GitBranch className="w-3 h-3" />
-                  {repoName}
-                </span>
-                <span className="flex items-center gap-1 capitalize">
-                  <Bot className="w-3 h-3" />
-                  {task.agentType.replace("-", " ")}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatRelativeTime(task.createdAt)}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {task.prUrl && (
-              <a
-                href={task.prUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 text-success text-xs hover:bg-success/20 transition-colors"
-              >
-                <ExternalLink className="w-3 h-3" />
-                PR #{task.prNumber ?? "?"}
-              </a>
-            )}
-            {canCancel && (
-              <button
-                onClick={handleCancel}
-                disabled={actionLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-error/10 text-error text-xs hover:bg-error/20 transition-colors disabled:opacity-50"
-              >
-                <XCircle className="w-3 h-3" />
-                Cancel
-              </button>
-            )}
-            {canRetry && (
-              <button
-                onClick={handleRetry}
-                disabled={actionLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors disabled:opacity-50"
-              >
-                <RotateCcw className="w-3 h-3" />
-                Retry
-              </button>
-            )}
-            {canForceRestart && (
-              <button
-                onClick={handleForceRestart}
-                disabled={actionLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 text-success text-xs hover:bg-success/20 transition-colors disabled:opacity-50"
-                title="Start a fresh agent session on the existing PR branch"
-              >
-                <Play className="w-3 h-3" />
-                Attempt Resume
-              </button>
-            )}
-            <button
-              onClick={handleForceRedo}
-              disabled={actionLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warning/10 text-warning text-xs hover:bg-warning/20 transition-colors disabled:opacity-50"
-            >
-              <RotateCcw className="w-3 h-3" />
-              Force Redo
-            </button>
-            <button
-              onClick={() => {
-                const prefill =
-                  task.state === "failed" && task.errorMessage
-                    ? `Task "${task.title}" (#${task.id.slice(0, 8)}) failed with: ${task.errorMessage.slice(0, 200)}`
-                    : `Help me with task "${task.title}" (#${task.id.slice(0, 8)})`;
-                optioChat.setPrefillInput(prefill);
-                optioChat.open();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors"
-            >
-              <Bot className="w-3 h-3" />
-              Ask Optio
-            </button>
-            <button
-              onClick={refresh}
-              className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+      <div className="flex items-center gap-3">
+        <Link href="/tasks" className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted">
+          <ArrowLeft className="w-4 h-4" />
+        </Link>
+        <Bot className="w-5 h-5 text-text-muted" />
+        <h1 className="text-lg font-semibold tracking-tight truncate">{task.title}</h1>
+        <div className="flex-1" />
+        <StateBadge state={task.state} />
       </div>
 
+      {/* Task info */}
+      <div className="p-4 rounded-xl border border-border/50 bg-bg-card space-y-4">
+        <div className="flex items-center gap-4 text-xs text-text-muted flex-wrap">
+          <span className="flex items-center gap-1">
+            <GitBranch className="w-3 h-3" />
+            {repoName}
+          </span>
+          <span className="flex items-center gap-1 capitalize">
+            <Bot className="w-3 h-3" />
+            {task.agentType.replace("-", " ")}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatRelativeTime(task.createdAt)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {task.prUrl && (
+            <a
+              href={task.prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 text-success text-xs hover:bg-success/20 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              PR #{task.prNumber ?? "?"}
+            </a>
+          )}
+          {canCancel && (
+            <button
+              onClick={handleCancel}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-error/10 text-error text-xs hover:bg-error/20 transition-colors disabled:opacity-50"
+            >
+              <XCircle className="w-3 h-3" />
+              Cancel
+            </button>
+          )}
+          {canRetry && (
+            <button
+              onClick={handleRetry}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors disabled:opacity-50"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Retry
+            </button>
+          )}
+          {canForceRestart && (
+            <button
+              onClick={handleForceRestart}
+              disabled={actionLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 text-success text-xs hover:bg-success/20 transition-colors disabled:opacity-50"
+              title="Start a fresh agent session on the existing PR branch"
+            >
+              <Play className="w-3 h-3" />
+              Attempt Resume
+            </button>
+          )}
+          <button
+            onClick={handleForceRedo}
+            disabled={actionLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warning/10 text-warning text-xs hover:bg-warning/20 transition-colors disabled:opacity-50"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Force Redo
+          </button>
+          <button
+            onClick={() => {
+              const prefill =
+                task.state === "failed" && task.errorMessage
+                  ? `Task "${task.title}" (#${task.id.slice(0, 8)}) failed with: ${task.errorMessage.slice(0, 200)}`
+                  : `Help me with task "${task.title}" (#${task.id.slice(0, 8)})`;
+              optioChat.setPrefillInput(prefill);
+              optioChat.open();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors"
+          >
+            <Bot className="w-3 h-3" />
+            Ask Optio
+          </button>
+          <button
+            onClick={refresh}
+            className="p-1.5 rounded-md hover:bg-bg-hover text-text-muted transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
       {/* Pending reason */}
       {pendingReason && (
         <div

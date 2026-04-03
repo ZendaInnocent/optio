@@ -749,3 +749,27 @@ export const eventCorrections = pgTable("event_corrections", {
 });
 
 export type EventCorrection = typeof eventCorrections.$inferSelect;
+
+// ── User-scoped API Keys (encrypted at rest) ───────────────────────────────────
+
+export const userApiKeys = pgTable(
+  "user_api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // "openai" | "anthropic"
+    encryptedValue: bytea("encrypted_value").notNull(),
+    iv: bytea("iv").notNull(),
+    authTag: bytea("auth_tag").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("user_api_keys_user_provider_key").on(table.userId, table.provider),
+    index("user_api_keys_user_id_idx").on(table.userId),
+  ],
+);
+
+export type UserApiKey = typeof userApiKeys.$inferSelect;
