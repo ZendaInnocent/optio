@@ -82,6 +82,8 @@ export async function sessionTerminalWs(app: FastifyInstance) {
       // Wait for repo to be ready
       "for i in $(seq 1 60); do [ -f /workspace/.ready ] && break; sleep 1; done",
       '[ -f /workspace/.ready ] || { echo "Repo not ready"; exit 1; }',
+      // Create worktree parent directory if it doesn't exist
+      `mkdir -p "$(dirname "${worktreePath}")"`,
       // Acquire repo lock for worktree setup
       "exec 9>/workspace/.repo-lock",
       "flock 9",
@@ -96,9 +98,9 @@ export async function sessionTerminalWs(app: FastifyInstance) {
       `[ -d "${worktreePath}" ] || { echo "ERROR: Worktree not created at ${worktreePath}"; exit 1; }`,
       "flock -u 9",
       "exec 9>&-",
-      // Launch interactive shell in worktree
+      // Launch interactive shell in worktree (non-login to avoid .bashrc env var dump)
       `cd "${worktreePath}"`,
-      "exec bash -l",
+      "exec bash",
     ].join("\n");
 
     let execSession: ExecSession | null = null;

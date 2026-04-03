@@ -242,4 +242,29 @@ describe("sessionTerminalWs", () => {
     );
     expect(mockSocket.close).toHaveBeenCalled();
   });
+
+  it("includes mkdir -p for worktree parent directory in setup script", async () => {
+    await handler(mockSocket, mockReq);
+
+    expect(mockRuntime.exec).toHaveBeenCalled();
+    const execCall = (mockRuntime.exec as any).mock.calls[0];
+    const setupScript = execCall[1][2];
+
+    // The setup script must create the parent directory before git worktree add
+    expect(setupScript).toContain("mkdir -p");
+    expect(setupScript).toContain("/workspace/sessions");
+  });
+
+  it("uses non-login shell to prevent environment variable dump on reconnect", async () => {
+    await handler(mockSocket, mockReq);
+
+    expect(mockRuntime.exec).toHaveBeenCalled();
+    const execCall = (mockRuntime.exec as any).mock.calls[0];
+    const setupScript = execCall[1][2];
+
+    // Should not use 'bash -l' which sources .bashrc and dumps environment variables
+    expect(setupScript).not.toContain("exec bash -l");
+    // Should use plain 'bash' instead
+    expect(setupScript).toMatch(/exec bash(?! -l)/);
+  });
 });
