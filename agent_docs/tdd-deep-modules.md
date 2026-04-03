@@ -79,3 +79,38 @@ Ask:
 - What does the caller really need to know?
 
 Keep the public API small. Hide the complexity inside.
+
+## Enforcement
+
+Deep module principles are enforced via ESLint:
+
+### 1. Max Exports Rule (`max-exports/max-exports`)
+
+- Warns when a file exports more than 8 items
+- Promotes small interfaces over bloated exports
+- Configured in `eslint.config.js`
+
+### 2. Layer Boundaries (`boundaries/element-types`)
+
+- Prevents layers from importing each other incorrectly
+- Rules:
+  - `services` → can only import `db`, `lib`, `shared`
+  - `routes` → can only import `services`, `db`, `lib`, `shared`
+  - `workers` → can only import `services`, `db`, `lib`, `shared`
+
+### Running Checks
+
+```bash
+# Lint with warnings
+pnpm lint
+
+# CI mode (fail on warnings)
+pnpm lint -- --max-warnings=0
+```
+
+### Configuration
+
+Edit `eslint.config.js` to adjust:
+
+- Max exports: `"max-exports/max-exports": ["warn", { max: 8 }]`
+- Boundary rules in each layer config

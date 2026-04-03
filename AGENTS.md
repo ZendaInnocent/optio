@@ -4,6 +4,8 @@
 
 Optio: workflow orchestration for AI coding agents. Spins up isolated K8s pods per repo, manages git worktrees for concurrent tasks, streams logs to web UI.
 
+Always be extremely concise. Sacrifice grammar for the sake of concesion.
+
 ## Context-Mode (MANDATORY)
 
 This project uses context-mode MCP tools. See `agent_docs/context-mode.md` for details.

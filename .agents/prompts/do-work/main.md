@@ -15,7 +15,7 @@ When `use_subagent_orchestration` is enabled (default: `true`):
 
 ### Delegation Strategy
 
-1. **Codebase Analysis**: Delegate to `codebase-analyzer` and `codebase-locator` sub-agents
+1. **Codebase Analysis**: Delegate to sub-agents
    - Use for: finding patterns, understanding architecture, locating components
    - Parallelize independent analyses
 

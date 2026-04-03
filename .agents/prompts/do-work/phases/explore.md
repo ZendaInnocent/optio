@@ -13,12 +13,12 @@ If `use_subagent_orchestration` is `true`:
 
 Delegate to specialized sub-agents:
 
-- **codebase-locator**: Find existing components, patterns, and related files
+- Find existing components, patterns, and related files
   - Query: "Where are similar features implemented?"
   - Query: "Find authentication-related code"
   - Query: "Show API endpoint patterns"
 
-- **codebase-analyzer**: Deep dive into architecture and dependencies
+- Deep dive into architecture and dependencies
   - Query: "Analyze the data flow for X feature"
   - Query: "What are the dependencies between modules A and B?"
 
