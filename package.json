@@ -53,6 +53,9 @@
     ],
     "*.{json,md,yml,yaml,css,mjs}": [
       "prettier --write"
+    ],
+    "apps/api/src/db/migrations/**/*.{sql,json}": [
+      "bash -c 'cd apps/api && npx vitest run src/db/migration-registry.test.ts'"
     ]
   },
   "packageManager": "pnpm@10.11.0"
