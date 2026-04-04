@@ -1,0 +1,10 @@
+# Build artifacts
+.turbo/
+**/.turbo/
+*.tsbuildinfo
+
+# Linting
+.eslintcache
+
+# Node modules (should already be in .dockerignore)
+node_modules/

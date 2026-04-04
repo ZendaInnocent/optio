@@ -24,13 +24,15 @@ web_node_port = 30310
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Base Image — all workspace dependencies
-# Only rebuilds when package.json or pnpm-lock.yaml changes.
+# Only rebuilds when Dockerfile.base, package.json or pnpm-lock.yaml change.
 # Both api and web dev images FROM this.
+# extra_tags creates the :latest alias so agent pods (with pullPolicy=Never) can find it.
 # ──────────────────────────────────────────────────────────────────────────────
 docker_build(
     "optio-base",
     ".",
     dockerfile="Dockerfile.base",
+    extra_tag="optio-base:latest",
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -68,10 +70,17 @@ docker_build(
 # ──────────────────────────────────────────────────────────────────────────────
 dev_encryption_key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
+# Agent pods use the :latest tag of optio-base (created by the custom_build above).
+# OPTIO_AGENT_IMAGE is set to "optio-base:latest" in the Helm secrets template.
+agent_image_repo = "optio-base"
+agent_image_tag = "latest"
+
 helm_values = [
     "--set", "api.image.pullPolicy=Never",
     "--set", "web.image.pullPolicy=Never",
     "--set", "agent.imagePullPolicy=Never",
+    "--set", "agent.image.repository=" + agent_image_repo,
+    "--set", "agent.image.tag=" + agent_image_tag,
     "--set", "api.service.type=NodePort",
     "--set", "api.service.nodePort=" + str(api_node_port),
     "--set", "web.service.type=NodePort",
@@ -112,4 +121,8 @@ k8s_resource(
 k8s_resource(
     release_name + "-web",
     port_forwards=[str(web_node_port) + ":3000"],
+)
+
+docker_prune_settings(
+    num_builds = 5,
 )
