@@ -7,6 +7,10 @@ FROM optio-base
 COPY apps/api/ apps/api/
 COPY packages/ packages/
 
+RUN chown -R 1000:1000 /app/apps/api /app/packages
+
+RUN chown -R 1000:1000 /app/apps/api /app/packages
+
 WORKDIR /app/apps/api
 EXPOSE 4000
 CMD ["tsx", "watch", "src/index.ts"]
