@@ -6,6 +6,8 @@ Optio: workflow orchestration for AI coding agents. Spins up isolated K8s pods p
 
 Always be extremely concise. Sacrifice grammar for the sake of concesion.
 
+**Mandatory**: Read contract `.agent_docs/contact.md`.
+
 ## Context-Mode (MANDATORY)
 
 This project uses context-mode MCP tools. See `agent_docs/context-mode.md` for details.
