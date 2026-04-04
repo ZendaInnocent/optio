@@ -11,7 +11,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Page error:", error);
+    // Error is handled by the UI — no console logging
   }, [error]);
 
   return (

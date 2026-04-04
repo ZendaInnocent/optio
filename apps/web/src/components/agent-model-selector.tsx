@@ -68,8 +68,8 @@ export function ModelSelector({
       try {
         const res = await api.getAvailableModels();
         setModels(res.models);
-      } catch (err) {
-        console.error("Failed to fetch models", err);
+      } catch {
+        // Silently fail — models are optional
       } finally {
         setLoading(false);
       }

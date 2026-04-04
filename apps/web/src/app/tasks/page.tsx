@@ -1,23 +1,23 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { usePageTitle } from "@/hooks/use-page-title";
 import { TaskList } from "@/components/task-list";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { api } from "@/lib/api-client";
-import { toast } from "sonner";
-import Link from "next/link";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import {
+  Check,
+  CircleDot,
+  GitBranch,
+  Loader2,
   Plus,
   RotateCcw,
-  XCircle,
-  Loader2,
-  Zap,
-  GitBranch,
-  CircleDot,
-  Check,
   X,
+  XCircle,
+  Zap,
 } from "lucide-react";
+import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function TasksPage() {
   usePageTitle("Tasks");

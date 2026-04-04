@@ -26,17 +26,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(
-      JSON.stringify({
-        type: "error_boundary",
-        section: this.props.label ?? "unknown",
-        error: error.message,
-        stack: error.stack,
-        componentStack: errorInfo.componentStack,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+  componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
+    // Error is captured in state — no console logging
   }
 
   handleRetry = () => {

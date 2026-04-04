@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { StateBadge } from "./state-badge";
 import { classifyError } from "@optio/shared";
 import { api } from "@/lib/api-client";
@@ -42,7 +41,6 @@ interface TaskCardProps {
 }
 
 export const TaskCard = React.memo(function TaskCard({ task, subtasks }: TaskCardProps) {
-  const router = useRouter();
   const optioChat = useOptioChatStore();
   const repoName = task.repoUrl.replace(/.*\/\/[^/]+\//, "").replace(/\.git$/, "");
   const [owner, repo] = repoName.includes("/") ? repoName.split("/") : ["", repoName];
@@ -50,7 +48,7 @@ export const TaskCard = React.memo(function TaskCard({ task, subtasks }: TaskCar
 
   return (
     <div
-      onClick={() => router.push(`/tasks/${task.id}`)}
+      onClick={() => (window.location.href = `/tasks/${task.id}`)}
       className={cn(
         "block rounded-md border border-border bg-bg-card cursor-pointer overflow-hidden card-hover",
       )}

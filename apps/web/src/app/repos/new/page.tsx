@@ -141,7 +141,6 @@ export default function NewRepoPage() {
       toast.success(`${fullName} added successfully`);
       router.push(`/repos/${repoId}`);
     } catch (err) {
-      console.error("Create repo error:", err);
       toast.error(err instanceof Error ? err.message : "Failed to create repository");
     } finally {
       setCreating(false);

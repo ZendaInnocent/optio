@@ -24,7 +24,7 @@ export default function NewTaskPage() {
     repoId: "",
     repoUrl: "",
     repoBranch: "main",
-    agentType: "claude-code",
+    agentType: "opencode",
     workflowType: "do-work" as "do-work" | "plan" | "review",
     maxRetries: 3,
     priority: 100,

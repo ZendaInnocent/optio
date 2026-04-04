@@ -19,7 +19,11 @@ import {
   Lightbulb,
 } from "lucide-react";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000";
+const WS_URL =
+  process.env.NEXT_PUBLIC_WS_URL ??
+  (typeof window !== "undefined"
+    ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
+    : "ws://localhost:4000");
 
 interface ChatEvent {
   taskId: string;
@@ -176,6 +180,7 @@ export function SessionChat({
           break;
 
         case "error":
+          setStatus("error");
           // If there's a current assistant message, add the error to it
           setMessages((prev) => {
             const msgs = [...prev];
@@ -198,6 +203,22 @@ export function SessionChat({
                 return msgs;
               }
             }
+            // No current message — create an error message
+            const errorMsg: ChatMessage = {
+              id: `error-${Date.now()}`,
+              role: "assistant",
+              content: msg.message,
+              timestamp: new Date().toISOString(),
+              events: [
+                {
+                  taskId: sessionId,
+                  timestamp: new Date().toISOString(),
+                  type: "error",
+                  content: msg.message,
+                },
+              ],
+            };
+            msgs.push(errorMsg);
             return msgs;
           });
           break;
