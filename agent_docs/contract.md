@@ -50,3 +50,8 @@ This document serves as the mandatory operational contract for all AI coding age
 
 - Search over Guessing: If a library, API, or syntax is unfamiliar, always use the `search` or `context7` tool. Do not hallucinate parameters.
 - For browser related tasks use `agent-browser`.
+
+7. Sandbox & Security
+
+- Credential Masking: Never type or paste API keys, passwords, or secrets into the browser search bar or terminal. Use environment variables (e.g., .env) exclusively.
+- Localhost Only: When testing web apps, stay within the localhost or 127.0.0.1 range unless external API calls are strictly required by the task.

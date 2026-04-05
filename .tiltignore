@@ -8,3 +8,13 @@
 
 # Node modules (should already be in .dockerignore)
 node_modules/
+
+# Ignore everything else for rebuild triggers
+**
+
+# Except Dockerfiles and dependency files
+!Dockerfile.base
+!Dockerfile.api.dev
+!Dockerfile.web.dev
+!package.json
+!pnpm-lock.yaml

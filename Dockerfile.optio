@@ -16,7 +16,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # OpenCode (cached npm install)
-RUN --mount=type=cache,id=npm,target=/root/.npm npm install -g opencode-ai
+RUN --mount=type=cache,id=npm,target=/root/.npm npm install -g opencode-ai \
+    && ln -sf /usr/local/lib/node_modules/opencode-ai/bin/opencode /usr/local/bin/opencode
 
 # Non-root user
 RUN useradd -m -s /bin/bash optio \

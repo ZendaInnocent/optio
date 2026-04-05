@@ -21,7 +21,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g opencode-ai
+RUN npm install -g opencode-ai \
+    && ln -sf /usr/local/lib/node_modules/opencode-ai/bin/opencode /usr/local/bin/opencode
 
 # Allow sudo for extra package installation at runtime
 RUN apt-get update && apt-get install -y sudo \

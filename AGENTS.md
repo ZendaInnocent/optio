@@ -1,12 +1,18 @@
 # AGENTS.md — Optio Agent Guidelines
 
+## Startup (MANDATORY — Execute First, Every Session)
+
+Before doing anything else, read these files in order:
+
+1. `agent_docs/contract.md` — Operational contract (mandatory adherence)
+
+**Do not answer questions, write code, or take any action until both files are read.**
+
 ## Project
 
 Optio: workflow orchestration for AI coding agents. Spins up isolated K8s pods per repo, manages git worktrees for concurrent tasks, streams logs to web UI.
 
 Always be extremely concise. Sacrifice grammar for the sake of concesion.
-
-**Mandatory**: Read contract `.agent_docs/contact.md`.
 
 ## Context-Mode (MANDATORY)
 

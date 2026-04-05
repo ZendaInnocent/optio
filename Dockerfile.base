@@ -6,8 +6,9 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@10 --activate
 
-# Install tsx globally (cached via npm cache mount)
-RUN --mount=type=cache,id=npm,target=/root/.npm npm install -g tsx
+# Install tsx, claude-code, opencode, and codex globally (cached via npm cache mount)
+RUN --mount=type=cache,id=npm,target=/root/.npm npm install -g tsx @anthropic-ai/claude-code opencode-ai codex-cli \
+    && ln -sf /usr/local/lib/node_modules/opencode-ai/bin/opencode /usr/local/bin/opencode
 
 # Install system dependencies (git, curl, sudo, gh CLI)
 RUN apt-get update && apt-get install -y git curl sudo unzip \
