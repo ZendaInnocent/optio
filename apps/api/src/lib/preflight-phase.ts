@@ -61,7 +61,7 @@ export async function runPreflight(ctx: TaskContext): Promise<PreflightResult> {
       .from(tasks)
       .where(sql`${tasks.state} IN (${TaskState.PROVISIONING}, ${TaskState.RUNNING})`);
     if (count >= maxConcurrent) {
-      log.info({ count, maxConcurrent }, "Global concurrency limit reached");
+      log.info("Global concurrency limit reached", { count, maxConcurrent });
       return {
         shouldProceed: false,
         requeue: true,
@@ -80,7 +80,7 @@ export async function runPreflight(ctx: TaskContext): Promise<PreflightResult> {
     const hour = now.getUTCHours();
     const isOffPeak = hour >= 18 || hour < 6;
     if (!isOffPeak) {
-      log.info({ hour }, "Off-peak only repo, skipping during peak hours");
+      log.info("Off-peak only repo, skipping during peak hours", { hour });
       return {
         shouldProceed: false,
         requeue: true,
@@ -96,7 +96,7 @@ export async function runPreflight(ctx: TaskContext): Promise<PreflightResult> {
   // ── Existing PR check ─────────────────────────────────────────────
   const existingPr = await checkExistingPr(task);
   if (existingPr) {
-    log.info({ prUrl: existingPr.url }, "Existing PR detected");
+    log.info("Existing PR detected", { prUrl: existingPr.url });
     return {
       shouldProceed: false,
       requeue: false,

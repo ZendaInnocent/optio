@@ -27,7 +27,7 @@ export async function runProvisioning(ctx: TaskContext): Promise<ProvisioningRes
       {},
       { customImage: imageTag },
       {
-        preferredPodId: isRetry ? ((task as any).lastPodId ?? undefined) : undefined,
+        preferredPodId: isRetry ? (task.lastPodId ?? undefined) : undefined,
         maxAgentsPerPod,
         maxPodInstances,
         networkPolicy: repo.networkPolicy ?? "unrestricted",
