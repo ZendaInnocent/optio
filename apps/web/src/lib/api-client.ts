@@ -44,6 +44,26 @@ export const api = {
     return request<{ runs: any[] }>(`/api/agent-runs${query ? `?${query}` : ""}`);
   },
 
+  getAgentRun: (id: string) => request<{ run: any }>(`/api/agent-runs/${id}`),
+
+  getAgentRunEvents: (id: string) => request<{ events: any[] }>(`/api/agent-runs/${id}/events`),
+
+  switchAgentRunMode: (id: string, mode: string) =>
+    request<{ run: any }>(`/api/agent-runs/${id}/mode`, {
+      method: "POST",
+      body: JSON.stringify({ mode }),
+    }),
+
+  endAgentRun: (id: string) =>
+    request<{ run: any }>(`/api/agent-runs/${id}/end`, {
+      method: "POST",
+    }),
+
+  interruptAgentRun: (id: string) =>
+    request<{ run: any }>(`/api/agent-runs/${id}/interrupt`, {
+      method: "POST",
+    }),
+
   // Tasks
   listTasks: (params?: { state?: string; limit?: number; offset?: number }) => {
     const qs = new URLSearchParams();
