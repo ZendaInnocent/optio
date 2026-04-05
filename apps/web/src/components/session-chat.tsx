@@ -234,7 +234,12 @@ export function SessionChat({
     };
 
     return () => {
-      ws.close();
+      // Don't close CONNECTING sockets — browser shows warning and they'll be GC'd anyway.
+      // This avoids "WebSocket is closed before the connection is established" noise
+      // from React Strict Mode double-mount in dev.
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     };
   }, [sessionId, onCostUpdate, scrollToBottom]);
 

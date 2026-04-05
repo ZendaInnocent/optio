@@ -8,6 +8,7 @@ export class WsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private url: string;
   private tokenProvider: TokenProvider | null;
+  private intentionalDisconnect = false;
 
   constructor(url: string, tokenProvider?: TokenProvider) {
     this.url = url;
@@ -15,6 +16,7 @@ export class WsClient {
   }
 
   connect(): void {
+    this.intentionalDisconnect = false;
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     // If a token provider is set, fetch a token before connecting.
@@ -51,20 +53,31 @@ export class WsClient {
     };
 
     this.ws.onclose = () => {
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      if (!this.intentionalDisconnect) {
+        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      }
     };
 
     this.ws.onerror = () => {
-      this.ws?.close();
+      if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
+        this.ws.close();
+      }
     };
   }
 
   disconnect(): void {
+    this.intentionalDisconnect = true;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.ws?.close();
+    if (
+      this.ws &&
+      this.ws.readyState !== WebSocket.CLOSED &&
+      this.ws.readyState !== WebSocket.CLOSING
+    ) {
+      this.ws.close();
+    }
     this.ws = null;
   }
 
