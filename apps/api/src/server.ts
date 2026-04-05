@@ -4,7 +4,6 @@ import formbody from "@fastify/formbody";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import { healthRoutes } from "./routes/health.js";
-import { taskRoutes } from "./routes/tasks.js";
 import { secretRoutes } from "./routes/secrets.js";
 import { ticketRoutes } from "./routes/tickets.js";
 import { setupRoutes } from "./routes/setup.js";
@@ -18,7 +17,6 @@ import { issueRoutes } from "./routes/issues.js";
 import { subtaskRoutes } from "./routes/subtasks.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { webhookRoutes } from "./routes/webhooks.js";
-import { sessionRoutes } from "./routes/sessions.js";
 import { scheduleRoutes } from "./routes/schedules.js";
 import { commentRoutes } from "./routes/comments.js";
 import { slackRoutes } from "./routes/slack.js";
@@ -33,6 +31,8 @@ import { optioSettingsRoutes } from "./routes/optio-settings.js";
 import { customImagesRoutes } from "./routes/custom-images.js";
 import { agentRoutes } from "./routes/agents.js";
 import { agentRunRoutes } from "./routes/agent-runs.js";
+import { registerCompatTaskRoutes } from "./routes/tasks.compat.js";
+import { registerCompatSessionRoutes } from "./routes/sessions.compat.js";
 import { registerAgentRunWebSocket } from "./ws/agent-runs.js";
 import { logStreamWs } from "./ws/log-stream.js";
 import { eventsWs } from "./ws/events.js";
@@ -74,7 +74,6 @@ export async function buildServer() {
 
   // REST routes
   await app.register(healthRoutes);
-  await app.register(taskRoutes);
   await app.register(secretRoutes);
   await app.register(ticketRoutes);
   await app.register(setupRoutes);
@@ -88,7 +87,7 @@ export async function buildServer() {
   await app.register(subtaskRoutes);
   await app.register(analyticsRoutes);
   await app.register(webhookRoutes);
-  await app.register(sessionRoutes);
+  await app.register(registerCompatTaskRoutes);
   await app.register(scheduleRoutes);
   await app.register(commentRoutes);
   await app.register(slackRoutes);
@@ -103,6 +102,7 @@ export async function buildServer() {
   await app.register(customImagesRoutes);
   await app.register(agentRoutes);
   await app.register(agentRunRoutes);
+  await app.register(registerCompatSessionRoutes);
 
   // WebSocket routes
   await app.register(logStreamWs);
