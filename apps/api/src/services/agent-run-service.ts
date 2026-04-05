@@ -75,10 +75,15 @@ export async function switchMode(runId: string, newMode: AgentRunMode) {
   const updated = await db
     .update(agentRuns)
     .set({ mode: newMode, updatedAt: new Date() })
-    .where(eq(agentRuns.id, runId))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.state, run.state)))
     .returning();
 
   if (!updated || updated.length === 0) {
+    const current = await getAgentRun(runId);
+    if (!current) throw new Error("Agent run not found");
+    if (current.state !== run.state) {
+      throw new Error("Concurrent state modification detected - cannot switch mode");
+    }
     throw new Error("Failed to update mode");
   }
 

@@ -303,7 +303,7 @@ describe("AgentRunService", () => {
 
   describe("switchMode", () => {
     it("changes mode and updates timestamp", async () => {
-      const existingRun = { id: "run-1", mode: "autonomous" };
+      const existingRun = { id: "run-1", mode: "autonomous", state: "running" };
       const updatedRun = { id: "run-1", mode: "interactive", updatedAt: new Date() };
 
       // Mock getAgentRun to return the existing run
@@ -337,6 +337,38 @@ describe("AgentRunService", () => {
       });
 
       await expect(switchMode("nonexistent", "interactive")).rejects.toThrow("Agent run not found");
+    });
+
+    it("detects concurrent state modification", async () => {
+      const existingRun = { id: "run-1", mode: "autonomous", state: "pending" };
+      const modifiedRun = { id: "run-1", mode: "autonomous", state: "running" };
+
+      // Mock db.select to return runs via proper chain
+      const limitMock = vi
+        .fn()
+        .mockResolvedValueOnce([existingRun]) // first .limit() call
+        .mockResolvedValueOnce([modifiedRun]); // second .limit() call after update fails
+
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: limitMock,
+          }),
+        }),
+      });
+
+      // Update returns empty array (0 rows affected)
+      (db.update as any) = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      await expect(switchMode("run-1", "interactive")).rejects.toThrow(
+        "Concurrent state modification detected - cannot switch mode",
+      );
     });
   });
 
