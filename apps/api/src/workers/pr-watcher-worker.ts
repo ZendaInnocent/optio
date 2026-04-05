@@ -2,9 +2,12 @@ import { Queue, Worker } from "bullmq";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { tasks, taskEvents, sessionPrs, interactiveSessions } from "../db/schema.js";
+import { agentRunPrs } from "../db/schema/agent-run-prs.js";
+import { agentRuns, AgentRunState } from "../db/schema/agent-runs.js";
 import { TaskState } from "@optio/shared";
 import { retrieveSecretWithFallback } from "../services/secret-service.js";
 import * as taskService from "../services/task-service.js";
+import * as agentRunService from "../services/agent-run-service.js";
 import { updateSessionPr } from "../services/interactive-session-service.js";
 import { taskQueue } from "./task-worker.js";
 import { logger } from "../logger.js";
@@ -130,6 +133,45 @@ export function determinePrAction(opts: {
   }
 
   return { action: "none" };
+}
+
+/**
+ * Process a PR event for an agent run and update its state accordingly.
+ */
+export async function processAgentRunPr(
+  agentRunId: string,
+  prUrl: string,
+  prData: { merged: boolean; state: string },
+): Promise<void> {
+  // Determine target state based on PR data
+  let targetState: AgentRunState;
+  if (prData.merged) {
+    targetState = "completed";
+  } else if (prData.state === "closed") {
+    targetState = "failed";
+  } else {
+    // PR is open, no state change needed
+    return;
+  }
+
+  try {
+    // Transition the agent run state
+    await agentRunService.transitionState(agentRunId, targetState, {});
+    logger.info({ agentRunId, prUrl, targetState }, "Agent run state updated via PR watcher");
+
+    // Update the agent_run_prs record to reflect the PR state
+    const prState = prData.merged ? "merged" : "closed";
+    await db
+      .update(agentRunPrs)
+      .set({ state: prState })
+      .where(sql`${agentRunPrs.agentRunId} = ${agentRunId} AND ${agentRunPrs.prUrl} = ${prUrl}`);
+  } catch (err) {
+    logger.warn(
+      { err, agentRunId, prUrl, targetState },
+      "Failed to transition agent run via PR watcher",
+    );
+    throw err;
+  }
 }
 
 export const prWatcherQueue = new Queue("pr-watcher", { connection: connectionOpts });
@@ -503,6 +545,61 @@ export function startPrWatcherWorker() {
           }
         }
       } // end if (openPrTasks.length > 0)
+
+      // --- Agent Run PR watching ---
+      // Find all open agent run PRs and update agent run states based on PR status
+      try {
+        const openAgentRunPrs = await db
+          .select({
+            agentRunId: agentRunPrs.agentRunId,
+            prUrl: agentRunPrs.prUrl,
+            prNumber: agentRunPrs.prNumber,
+            workspaceId: agentRuns.workspaceId,
+          })
+          .from(agentRunPrs)
+          .innerJoin(agentRuns, eq(agentRuns.id, agentRunPrs.agentRunId))
+          .where(eq(agentRunPrs.state, "open"));
+
+        if (openAgentRunPrs.length > 0) {
+          for (const arPr of openAgentRunPrs) {
+            const githubToken = await getGithubToken(arPr.workspaceId);
+            if (!githubToken) continue;
+
+            const headers = {
+              Authorization: `Bearer ${githubToken}`,
+              "User-Agent": "Optio",
+              Accept: "application/vnd.github.v3+json",
+            };
+
+            try {
+              const match = arPr.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+              if (!match) continue;
+              const [, owner, repo, prNumStr] = match;
+              const prNumber = parseInt(prNumStr, 10);
+
+              const prRes = await fetch(
+                `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
+                { headers },
+              );
+              if (!prRes.ok) continue;
+              const prData = (await prRes.json()) as any;
+
+              // Process the PR status for this agent run
+              await processAgentRunPr(arPr.agentRunId, arPr.prUrl, {
+                merged: !!prData.merged,
+                state: prData.state,
+              });
+            } catch (err) {
+              logger.warn(
+                { err, agentRunId: arPr.agentRunId, prUrl: arPr.prUrl },
+                "Failed to process agent run PR",
+              );
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to run agent run PR watcher");
+      }
 
       // --- Session PR watching ---
       // Poll PRs tracked in active sessions to keep CI/review/merge status up to date
