@@ -12,6 +12,7 @@ import {
 import { workspaces, repos } from "../schema.js";
 
 export const agentRunMode = pgEnum("agent_run_mode", ["autonomous", "supervised", "interactive"]);
+export type AgentRunMode = (typeof agentRunMode.enumValues)[number];
 export const agentRunState = pgEnum("agent_run_state", [
   "pending",
   "queued",
@@ -22,6 +23,7 @@ export const agentRunState = pgEnum("agent_run_state", [
   "failed",
   "cancelled",
 ]);
+export type AgentRunState = (typeof agentRunState.enumValues)[number];
 
 // Agent runs: track high-level execution of an agent on a repo
 export const agentRuns = pgTable(
