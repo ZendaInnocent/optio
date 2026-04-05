@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { eq, and, lt, sql, asc, isNull, desc, or } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { repoPods, tasks, customImages, repos, optioSettings } from "../db/schema.js";
+import {
+  repoPods,
+  tasks,
+  customImages,
+  repos,
+  optioSettings,
+  interactiveSessions,
+} from "../db/schema.js";
 import { getRuntime } from "./container-service.js";
 import type { ContainerHandle, ContainerSpec, ExecSession, RepoImageConfig } from "@optio/shared";
 import {
@@ -662,6 +669,16 @@ export async function updateWorktreeState(taskId: string, worktreeState: string)
 export async function cleanupIdleRepoPods(): Promise<number> {
   const cutoff = new Date(Date.now() - IDLE_TIMEOUT_MS);
 
+  // Find pods with active sessions — these must NOT be cleaned up
+  const podsWithActiveSessions = await db
+    .select({ podId: interactiveSessions.podId })
+    .from(interactiveSessions)
+    .where(eq(interactiveSessions.state, "active"));
+
+  const activeSessionPodIds = new Set(
+    podsWithActiveSessions.map((p) => p.podId).filter((id): id is string => id !== null),
+  );
+
   const idlePods = await db
     .select()
     .from(repoPods)
@@ -673,12 +690,15 @@ export async function cleanupIdleRepoPods(): Promise<number> {
       ),
     );
 
+  // Filter out pods that have active sessions
+  const eligibleForCleanup = idlePods.filter((pod) => !activeSessionPodIds.has(pod.id));
+
   const rt = getRuntime();
   let cleaned = 0;
 
   // Group by repoUrl to implement scale-down logic
   const podsByRepo = new Map<string, (typeof idlePods)[number][]>();
-  for (const pod of idlePods) {
+  for (const pod of eligibleForCleanup) {
     const existing = podsByRepo.get(pod.repoUrl) ?? [];
     existing.push(pod);
     podsByRepo.set(pod.repoUrl, existing);

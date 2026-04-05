@@ -62,6 +62,11 @@ vi.mock("../db/schema.js", () => ({
     workspaceId: "workspaceId",
     defaultLanguagePreset: "defaultLanguagePreset",
   },
+  interactiveSessions: {
+    id: "id",
+    podId: "podId",
+    state: "state",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -315,7 +320,9 @@ describe("cleanupIdleRepoPods", () => {
   });
 
   it("returns 0 when no idle pods exist", async () => {
-    vi.mocked(db.select().from(undefined as any).where as any).mockResolvedValueOnce([]);
+    vi.mocked(db.select().from(undefined as any).where as any)
+      .mockResolvedValueOnce([]) // active sessions query
+      .mockResolvedValueOnce([]); // idle pods query
 
     const cleaned = await cleanupIdleRepoPods();
     expect(cleaned).toBe(0);
@@ -332,7 +339,9 @@ describe("cleanupIdleRepoPods", () => {
       instanceIndex: 0,
     };
 
-    vi.mocked(db.select().from(undefined as any).where as any).mockResolvedValueOnce([idlePod]);
+    vi.mocked(db.select().from(undefined as any).where as any)
+      .mockResolvedValueOnce([]) // no active sessions
+      .mockResolvedValueOnce([idlePod]);
 
     mockRuntimeDestroy.mockResolvedValueOnce(undefined);
     vi.mocked(db.delete(undefined as any).where as any).mockResolvedValueOnce(undefined);
@@ -365,7 +374,9 @@ describe("cleanupIdleRepoPods", () => {
       },
     ];
 
-    vi.mocked(db.select().from(undefined as any).where as any).mockResolvedValueOnce(pods);
+    vi.mocked(db.select().from(undefined as any).where as any)
+      .mockResolvedValueOnce([]) // no active sessions
+      .mockResolvedValueOnce(pods);
 
     mockRuntimeDestroy
       .mockRejectedValueOnce(new Error("Failed to destroy"))
@@ -388,12 +399,35 @@ describe("cleanupIdleRepoPods", () => {
       instanceIndex: 0,
     };
 
-    vi.mocked(db.select().from(undefined as any).where as any).mockResolvedValueOnce([pod]);
+    vi.mocked(db.select().from(undefined as any).where as any)
+      .mockResolvedValueOnce([]) // no active sessions
+      .mockResolvedValueOnce([pod]);
     vi.mocked(db.delete(undefined as any).where as any).mockResolvedValue(undefined);
 
     const cleaned = await cleanupIdleRepoPods();
     expect(cleaned).toBe(1);
     expect(mockRuntimeDestroy).not.toHaveBeenCalled();
+  });
+
+  it("skips pods that have active sessions", async () => {
+    const pod = {
+      id: "pod-1",
+      repoUrl: "https://github.com/org/repo",
+      podName: "optio-repo-org-repo-abc1",
+      podId: "k8s-pod-id-1",
+      state: "ready",
+      activeTaskCount: 0,
+      instanceIndex: 0,
+    };
+
+    vi.mocked(db.select().from(undefined as any).where as any)
+      .mockResolvedValueOnce([{ podId: "pod-1" }]) // pod has active session
+      .mockResolvedValueOnce([pod]);
+
+    const cleaned = await cleanupIdleRepoPods();
+    expect(cleaned).toBe(0);
+    expect(mockRuntimeDestroy).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
   });
 });
 
