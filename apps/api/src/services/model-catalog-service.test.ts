@@ -34,17 +34,25 @@ import { db } from "../db/client.js";
 
 const FREE_MODELS = [
   { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
-  { id: "mimo-v2-pro-free", name: "Mimo V2 Pro Free", provider: "opencode-zen", isFree: true },
-  { id: "mimo-v2-omni-free", name: "Mimo V2 Omni Free", provider: "opencode-zen", isFree: true },
-  { id: "qwen3-6-plus-free", name: "Qwen3 6 Plus Free", provider: "opencode-zen", isFree: true },
+  { id: "opencode/gpt-5-nano", name: "GPT-5 Nano (Free)", provider: "opencode-zen", isFree: true },
   {
-    id: "nemotron-3-super-free",
+    id: "opencode/minimax-m2.5-free",
+    name: "Minimax M2.5 Free",
+    provider: "opencode-zen",
+    isFree: true,
+  },
+  {
+    id: "opencode/nemotron-3-super-free",
     name: "Nemotron 3 Super Free",
     provider: "opencode-zen",
     isFree: true,
   },
-  { id: "minimax-m2-5-free", name: "Minimax M2-5 Free", provider: "opencode-zen", isFree: true },
-  { id: "gpt-5-nano", name: "GPT-5 Nano", provider: "opencode-zen", isFree: true },
+  {
+    id: "opencode/qwen3.6-plus-free",
+    name: "Qwen3.6 Plus Free",
+    provider: "opencode-zen",
+    isFree: true,
+  },
 ];
 
 describe("model-catalog-service", () => {

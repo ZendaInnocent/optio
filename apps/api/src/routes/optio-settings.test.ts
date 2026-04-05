@@ -317,8 +317,26 @@ describe("GET /api/optio/settings/models", () => {
     mockGetAvailableModels.mockResolvedValue([
       { id: "opencode/big-pickle", name: "Big Pickle", provider: "opencode-zen", isFree: true },
       {
-        id: "mimo-v2-pro-free",
-        name: "Mimo V2 Pro (Free)",
+        id: "opencode/minimax-m2.5-free",
+        name: "Minimax M2.5 (Free)",
+        provider: "opencode-zen",
+        isFree: true,
+      },
+      {
+        id: "opencode/gpt-5-nano",
+        name: "GPT-5 Nano (Free)",
+        provider: "opencode-zen",
+        isFree: true,
+      },
+      {
+        id: "opencode/nemotron-3-super-free",
+        name: "Nemotron 3 Super (Free)",
+        provider: "opencode-zen",
+        isFree: true,
+      },
+      {
+        id: "opencode/qwen3.6-plus-free",
+        name: "Qwen3.6 Plus (Free)",
         provider: "opencode-zen",
         isFree: true,
       },
@@ -334,7 +352,7 @@ describe("GET /api/optio/settings/models", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.models).toHaveLength(3);
+    expect(body.models).toHaveLength(6);
     expect(body.models[0]).toMatchObject({
       id: "opencode/big-pickle",
       name: "Big Pickle",
