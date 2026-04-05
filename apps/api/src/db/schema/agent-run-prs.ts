@@ -13,7 +13,6 @@ export const agentRunPrs = pgTable(
     title: text("title"),
     state: text("state"), // open, merged, closed
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("agent_run_prs_agent_run_id_idx").on(table.agentRunId)],
 );

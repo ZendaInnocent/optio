@@ -1,10 +1,19 @@
-import { pgTable, uuid, timestamp, integer, jsonb, text, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  bigserial,
+  uuid,
+  timestamp,
+  integer,
+  jsonb,
+  text,
+  index,
+} from "drizzle-orm/pg-core";
 import { agentRuns } from "./agent-runs.js";
 
 export const agentRunEvents = pgTable(
   "agent_run_events",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: bigserial({ mode: "bigint" }).primaryKey(),
     agentRunId: uuid("agent_run_id")
       .notNull()
       .references(() => agentRuns.id, { onDelete: "cascade" }),
