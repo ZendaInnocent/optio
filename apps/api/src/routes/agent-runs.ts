@@ -129,6 +129,9 @@ export async function agentRunRoutes(app: FastifyInstance) {
     "/api/agent-runs/:id/events",
     { preValidation: app.authRequired },
     async (req: any, reply: any) => {
+      const { id } = req.params as { id: string };
+      const run = await agentRunService.getAgentRun(id);
+      if (!run) return reply.code(404).send({ error: "Not found" });
       // TODO: implement pagination from agent_run_events
       reply.send([]);
     },

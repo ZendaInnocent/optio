@@ -375,6 +375,7 @@ describe("Agent Run Routes", () => {
 
   describe("GET /api/agent-runs/:id/events", () => {
     it("returns empty list (stub)", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       const res = await app.inject({
         method: "GET",
         url: "/api/agent-runs/run-123/events",
@@ -382,6 +383,16 @@ describe("Agent Run Routes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual([]);
+    });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/agent-runs/nonexistent/events",
+      });
+
+      expect(res.statusCode).toBe(404);
     });
   });
 
