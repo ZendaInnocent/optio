@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { StateBadge } from "@/components/state-badge";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,18 @@ export function AgentRunCard({ run }: AgentRunCardProps) {
               {owner && <span className="text-text-muted/50">{owner}/</span>}
               <span>{repo}</span>
               <span className="text-text-muted/30 mx-1">&middot;</span>
-              <span className="capitalize">{run.mode}</span>
+              <Badge
+                variant={
+                  run.mode === "autonomous"
+                    ? "default"
+                    : run.mode === "supervised"
+                      ? "secondary"
+                      : "outline"
+                }
+                className="capitalize"
+              >
+                {run.mode}
+              </Badge>
               {run.model && (
                 <>
                   <span className="text-text-muted/30 mx-1">&middot;</span>
