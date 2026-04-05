@@ -33,6 +33,7 @@ import { optioSettingsRoutes } from "./routes/optio-settings.js";
 import { customImagesRoutes } from "./routes/custom-images.js";
 import { agentRoutes } from "./routes/agents.js";
 import { agentRunRoutes } from "./routes/agent-runs.js";
+import { registerAgentRunWebSocket } from "./ws/agent-runs.js";
 import { logStreamWs } from "./ws/log-stream.js";
 import { eventsWs } from "./ws/events.js";
 import { sessionTerminalWs } from "./ws/session-terminal.js";
@@ -109,6 +110,7 @@ export async function buildServer() {
   await app.register(sessionTerminalWs);
   await app.register(sessionChatWs);
   await app.register(optioChatWs);
+  await app.register(registerAgentRunWebSocket);
 
   // Global error handler for Zod validation
   app.setErrorHandler((error: FastifyError | Error, _req, reply) => {
