@@ -26,11 +26,26 @@ export async function runExecution(ctx: TaskContext): Promise<ExecutionResult> {
 
   // Build agent command
   const adapter = getAdapter(task.agentType);
-  const agentCommand = adapter.buildAgentCommand(ctx.secrets, {
-    taskId: task.id,
-    prompt: task.prompt,
-    repoUrl: task.repoUrl,
-    repoBranch: task.repoBranch,
+  const isReview = task.workflowType === "review";
+  const maxTurns = isReview ? (repo.maxTurnsReview ?? 10) : (repo.maxTurnsCoding ?? 250);
+
+  const env: Record<string, string> = {
+    ...ctx.secrets,
+    OPTIO_TASK_ID: task.id,
+    OPTIO_REPO_URL: task.repoUrl,
+    OPTIO_REPO_BRANCH: task.repoBranch,
+    OPTIO_PROMPT: task.prompt,
+    OPTIO_AGENT_TYPE: task.agentType,
+    OPTIO_BRANCH_NAME: `optio-${task.id}`,
+    OPTIO_AUTH_MODE: "api-key",
+  };
+
+  const agentCommand = adapter.buildAgentCommand(env, {
+    isReview,
+    maxTurnsCoding: !isReview ? maxTurns : undefined,
+    maxTurnsReview: isReview ? maxTurns : undefined,
+    resumeSessionId: ctx.sessionId ?? undefined,
+    resumePrompt: ctx.resumePrompt,
   });
 
   // Execute in repo pod
@@ -64,7 +79,7 @@ export async function runExecution(ctx: TaskContext): Promise<ExecutionResult> {
       if (parsed.sessionId && !ctx.sessionId) {
         ctx.sessionId = parsed.sessionId;
         await updateTaskSession(taskId, parsed.sessionId);
-        log.info({ sessionId: parsed.sessionId }, "Session ID captured");
+        log.info("Session ID captured", { sessionId: parsed.sessionId });
       }
       for (const entry of parsed.entries) {
         await appendTaskLog(taskId, entry.content, "stdout", entry.type, entry.metadata);
@@ -89,7 +104,7 @@ export async function runExecution(ctx: TaskContext): Promise<ExecutionResult> {
               const url = repoMatches[repoMatches.length - 1];
               ctx.prUrl = url;
               await updateTaskPr(taskId, url);
-              log.info({ prUrl: url }, "PR URL detected in logs");
+              log.info("PR URL detected in logs", { prUrl: url });
             }
           }
         }
@@ -121,6 +136,6 @@ export async function runExecution(ctx: TaskContext): Promise<ExecutionResult> {
   ctx.agentError = result.error ? new Error(result.error) : null;
   ctx.agentResult = result.summary;
 
-  log.info({ exitCode: inferredExitCode, summary: result.summary }, "Agent execution complete");
+  log.info("Agent execution complete", { exitCode: inferredExitCode, summary: result.summary });
   return { success: true };
 }

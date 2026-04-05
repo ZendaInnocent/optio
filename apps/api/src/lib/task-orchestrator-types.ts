@@ -35,6 +35,7 @@ export interface TaskContext {
   agentImage: string;
   secrets: Record<string, string>;
   sessionId: string | null;
+  resumePrompt: string | null;
   prUrl: string | null;
   agentExitCode: number | null;
   agentError: Error | null;

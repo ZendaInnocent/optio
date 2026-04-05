@@ -117,6 +117,7 @@ export class TaskOrchestrator {
         agentImage: "optio/agent:latest",
         secrets: {},
         sessionId: null,
+        resumePrompt: null,
         prUrl: null,
         agentExitCode: null,
         agentError: null,
