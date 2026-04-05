@@ -108,11 +108,19 @@ export async function sessionChatWs(app: FastifyInstance) {
     }
 
     // Optio settings take precedence, then session override, then repo config, then default
-    let currentModel =
-      optioSettings.model ||
-      session.model ||
-      repoConfig?.claudeModel ||
-      (currentAgentType === "opencode" ? "opencode/big-pickle" : "sonnet");
+    // Model resolution: optio settings → session override → repo config → agent default
+    // For opencode agent, ensure we use a valid opencode model (not claude model names)
+    let currentModel: string;
+    if (currentAgentType === "opencode") {
+      currentModel =
+        (optioSettings.model && optioSettings.model.startsWith("opencode/")
+          ? optioSettings.model
+          : null) ||
+        session.model ||
+        "opencode/big-pickle";
+    } else {
+      currentModel = optioSettings.model || session.model || repoConfig?.claudeModel || "sonnet";
+    }
 
     const rt = getRuntime();
     const handle = { id: pod.podId ?? pod.podName, name: pod.podName };
