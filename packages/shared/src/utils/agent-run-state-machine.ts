@@ -33,15 +33,9 @@ const VALID_TRANSITIONS: Record<AgentRunState, AgentRunState[]> = {
 export function canTransition(
   from: AgentRunState,
   to: AgentRunState,
-  ctx: TransitionContext = {},
+  _ctx: TransitionContext = {},
 ): boolean {
-  // Mode switches are special: they may change the mode field but keep state as-is or move to needs_attention
-  if (ctx.modeSwitch) {
-    // Allow mode switch from any state to needs_attention (for interactive uplink)
-    // Or keep same state if just changing mode mid-run
-    return true;
-  }
-
+  // Mode switch is metadata; still require valid state transition
   const allowed = VALID_TRANSITIONS[from];
   return allowed.includes(to);
 }
@@ -55,7 +49,3 @@ export const TERMINAL_STATES: AgentRunState[] = [
   AgentRunState.FAILED,
   AgentRunState.CANCELLED,
 ];
-
-export function getTerminalStates(): AgentRunState[] {
-  return TERMINAL_STATES;
-}
