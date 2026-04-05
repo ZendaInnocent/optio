@@ -100,6 +100,8 @@ export async function recordEvent(runId: string, type: string, content: any, tur
 }
 
 export async function registerPr(runId: string, prUrl: string, prNumber?: number, title?: string) {
+  const run = await getAgentRun(runId);
+  if (!run) throw new Error("Agent run not found");
   await db.insert(agentRunPrs).values({
     agentRunId: runId,
     prUrl,

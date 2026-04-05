@@ -25,10 +25,20 @@ import { agentRunRoutes } from "./agent-runs.js";
 async function buildTestApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   app.decorateRequest("user", undefined as any);
-  app.addHook("preHandler", (req: any, _reply: any, done: any) => {
+  app.addHook("preValidation", (req: any, _reply: any, done: any) => {
     req.user = { workspaceId: "ws-1" };
     done();
   });
+  await agentRunRoutes(app);
+  app.setErrorHandler((_error: any, _req: any, reply: any) => {
+    reply.status(500).send({ error: "Internal server error" });
+  });
+  await app.ready();
+  return app;
+}
+
+async function buildTestAppNoAuth(): Promise<FastifyInstance> {
+  const app = Fastify({ logger: false });
   await agentRunRoutes(app);
   app.setErrorHandler((_error: any, _req: any, reply: any) => {
     reply.status(500).send({ error: "Internal server error" });
@@ -47,6 +57,90 @@ describe("Agent Run Routes", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  describe("Authentication", () => {
+    it("POST /api/agent-runs returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs",
+        payload: {
+          title: "Test",
+          initialPrompt: "Test",
+          repoId: "123e4567-e89b-12d3-a456-426614174000",
+          workspaceId: "123e4567-e89b-12d3-a456-426614174001",
+          agentType: "claude-code",
+          mode: "autonomous",
+        },
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("GET /api/agent-runs/:id returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/agent-runs/run-123",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("POST /api/agent-runs/:id/mode returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/mode",
+        payload: { mode: "autonomous" },
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("POST /api/agent-runs/:id/interrupt returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/interrupt",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("POST /api/agent-runs/:id/resume returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/resume",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("POST /api/agent-runs/:id/end returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/end",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("GET /api/agent-runs/:id/prs returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/agent-runs/run-123/prs",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("POST /api/agent-runs/:id/prs returns 401 without auth", async () => {
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/prs",
+        payload: { prUrl: "https://github.com/org/repo/pull/42" },
+      });
+      expect(res.statusCode).toBe(401);
+    });
   });
 
   describe("POST /api/agent-runs", () => {
@@ -80,12 +174,29 @@ describe("Agent Run Routes", () => {
       expect(body.state).toBe("pending");
     });
 
-    it("returns 400 for invalid schema", async () => {
+    it("returns 400 for missing required fields", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/agent-runs",
         payload: {
           title: "Test",
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("returns 400 for invalid mode value", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/agent-runs",
+        payload: {
+          title: "Test",
+          initialPrompt: "Prompt",
+          repoId: "123e4567-e89b-12d3-a456-426614174000",
+          workspaceId: "123e4567-e89b-12d3-a456-426614174001",
+          agentType: "claude-code",
+          mode: "invalid",
         },
       });
 
@@ -131,6 +242,7 @@ describe("Agent Run Routes", () => {
         mode: "supervised",
         state: "running",
       };
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       mockSwitchMode.mockResolvedValue(mockRun);
 
       const res = await app.inject({
@@ -157,6 +269,18 @@ describe("Agent Run Routes", () => {
 
       expect(res.statusCode).toBe(400);
     });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/agent-runs/nonexistent/mode",
+        payload: {
+          mode: "autonomous",
+        },
+      });
+      expect(res.statusCode).toBe(404);
+    });
   });
 
   describe("POST /api/agent-runs/:id/interrupt", () => {
@@ -165,6 +289,7 @@ describe("Agent Run Routes", () => {
         id: "run-123",
         state: "needs_attention",
       };
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       mockTransitionState.mockResolvedValue(mockRun);
 
       const res = await app.inject({
@@ -176,6 +301,15 @@ describe("Agent Run Routes", () => {
       expect(res.json()).toEqual(mockRun);
       expect(mockTransitionState).toHaveBeenCalledWith("run-123", "needs_attention");
     });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/agent-runs/nonexistent/interrupt",
+      });
+      expect(res.statusCode).toBe(404);
+    });
   });
 
   describe("POST /api/agent-runs/:id/resume", () => {
@@ -184,6 +318,7 @@ describe("Agent Run Routes", () => {
         id: "run-123",
         state: "running",
       };
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       mockTransitionState.mockResolvedValue(mockRun);
 
       const res = await app.inject({
@@ -198,6 +333,15 @@ describe("Agent Run Routes", () => {
       expect(res.json()).toEqual(mockRun);
       expect(mockTransitionState).toHaveBeenCalledWith("run-123", "running");
     });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/agent-runs/nonexistent/resume",
+      });
+      expect(res.statusCode).toBe(404);
+    });
   });
 
   describe("POST /api/agent-runs/:id/end", () => {
@@ -206,6 +350,7 @@ describe("Agent Run Routes", () => {
         id: "run-123",
         state: "completed",
       };
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       mockTransitionState.mockResolvedValue(mockRun);
 
       const res = await app.inject({
@@ -216,6 +361,15 @@ describe("Agent Run Routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual(mockRun);
       expect(mockTransitionState).toHaveBeenCalledWith("run-123", "completed");
+    });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/agent-runs/nonexistent/end",
+      });
+      expect(res.statusCode).toBe(404);
     });
   });
 
@@ -233,6 +387,7 @@ describe("Agent Run Routes", () => {
 
   describe("GET /api/agent-runs/:id/prs", () => {
     it("returns empty list (stub)", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       const res = await app.inject({
         method: "GET",
         url: "/api/agent-runs/run-123/prs",
@@ -241,10 +396,21 @@ describe("Agent Run Routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual([]);
     });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/agent-runs/nonexistent/prs",
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
   });
 
   describe("POST /api/agent-runs/:id/prs", () => {
     it("registers a PR", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       mockRegisterPr.mockResolvedValue(undefined);
 
       const res = await app.inject({
@@ -268,6 +434,7 @@ describe("Agent Run Routes", () => {
     });
 
     it("returns 400 for invalid URL", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
       const res = await app.inject({
         method: "POST",
         url: "/api/agent-runs/run-123/prs",
@@ -277,6 +444,18 @@ describe("Agent Run Routes", () => {
       });
 
       expect(res.statusCode).toBe(400);
+    });
+
+    it("returns 404 for nonexistent agent run", async () => {
+      mockGetAgentRun.mockResolvedValue(null);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/agent-runs/nonexistent/prs",
+        payload: {
+          prUrl: "https://github.com/org/repo/pull/42",
+        },
+      });
+      expect(res.statusCode).toBe(404);
     });
   });
 });
