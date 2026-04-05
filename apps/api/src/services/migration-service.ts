@@ -149,16 +149,16 @@ export class MigrationService {
           agentType: task.agentType,
           model: task.modelUsed,
           branchName: task.repoBranch,
-          worktreePath: task.worktreePath || null,
+          worktreePath: null,
           sessionId: task.sessionId,
           prUrl: task.prUrl || null,
-          costUsd: costUsd,
+          costUsd: costUsd.toString(),
           maxTurns: 50,
           metadata: { dependsOn },
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
           endedAt: task.completedAt,
-        })
+        } as any)
         .onConflictDoNothing();
 
       migratedCount++;
@@ -182,14 +182,7 @@ export class MigrationService {
         continue;
       }
 
-      // Determine state: if endedAt is set, use "ended" (but agentRunState doesn't have "ended", use "completed" or "cancelled"?)
-      // Plan says: endedAt is set. But agentRunState doesn't have "ended". Let's check available states:
-      // pending, queued, provisioning, running, needs_attention, completed, failed, cancelled.
-      // For interactive sessions, when they're ended, that typically means completed or cancelled. The schema has state "active" or "ended".
-      // Let's map "ended" to "completed" for now. But the plan sample code uses session.ended_at ? "ended" : "running".
-      // That would be invalid. Looking at agent-runs.ts, there is no "ended" state. Maybe they meant to set endedAt field and keep state as "running"? Or use "cancelled"?
-      // Actually the plan sample says: state: session.ended_at ? "ended" : "running".
-      // But that's from the design doc which may be outdated. Let's use "completed" for ended sessions, "running" for active.
+      // Determine state: if endedAt is set, use "completed"
       const state = session.endedAt ? "completed" : "running";
 
       const costUsd = this.parseCost(session.costUsd);
@@ -200,7 +193,7 @@ export class MigrationService {
           id: session.id,
           workspaceId: repoInfo.workspaceId || sql`'00000000-0000-0000-0000-000000000000'::uuid`,
           repoId: repoInfo.repoId,
-          title: session.title || `Interactive session ${session.id}`,
+          title: `Interactive session ${session.id}`,
           initialPrompt: "",
           mode: "interactive",
           state: state as any,
@@ -208,13 +201,14 @@ export class MigrationService {
           model: session.model,
           worktreePath: session.worktreePath || null,
           branchName: session.branch,
-          sessionId: session.sessionId,
-          costUsd: costUsd,
-          maxTurns: 100, // default for interactive, could override if stored
+          sessionId: null,
+          prUrl: null,
+          costUsd: costUsd.toString(),
+          maxTurns: 100,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt,
           endedAt: session.endedAt,
-        })
+        } as any)
         .onConflictDoNothing();
 
       migratedCount++;
@@ -227,13 +221,21 @@ export class MigrationService {
     const logs = await db.select().from(taskLogs);
 
     for (const log of logs) {
-      await db.insert(agentRunEvents).values({
-        agentRunId: log.taskId,
-        timestamp: log.timestamp,
-        type: "log",
-        content: { text: log.content, stream: log.stream, logType: log.logType || "text" },
-        turn: log.turn || null,
-      });
+      await db
+        .insert(agentRunEvents)
+        .values({
+          agentRunId: log.taskId,
+          timestamp: log.timestamp,
+          type: "log",
+          content: {
+            type: "log",
+            text: log.content,
+            stream: log.stream,
+            logType: log.logType || "text",
+          },
+          turn: null,
+        } as any)
+        .onConflictDoNothing();
     }
 
     this.logger.info(`Migrated ${logs.length} task logs to agent_run_events`);
@@ -243,13 +245,16 @@ export class MigrationService {
     const messages = await db.select().from(sessionMessages);
 
     for (const msg of messages) {
-      await db.insert(agentRunEvents).values({
-        agentRunId: msg.sessionId,
-        timestamp: msg.timestamp,
-        type: "message",
-        content: { role: this.mapRole(msg.role), content: msg.content },
-        turn: null,
-      });
+      await db
+        .insert(agentRunEvents)
+        .values({
+          agentRunId: msg.sessionId,
+          timestamp: msg.timestamp,
+          type: "message",
+          content: { type: "message", role: this.mapRole(msg.role), content: msg.content },
+          turn: null,
+        } as any)
+        .onConflictDoNothing();
     }
 
     this.logger.info(`Migrated ${messages.length} session messages to agent_run_events`);
@@ -268,7 +273,7 @@ export class MigrationService {
         title: null,
         state: spr.prState || null,
         createdAt: spr.createdAt,
-      });
+      } as any);
     }
 
     this.logger.info(`Migrated ${prs.length} session PRs to agent_run_prs`);

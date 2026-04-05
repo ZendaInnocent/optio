@@ -20,7 +20,8 @@ export type AgentRunEventContent =
   | { type: "system"; message: string }
   | { type: "error"; message: string }
   | { type: "info"; data: unknown }
-  | { type: "message"; role: "user" | "assistant"; content: string };
+  | { type: "message"; role: "user" | "assistant"; content: string }
+  | { type: "log"; text: string; stream: string; logType: string };
 
 export const agentRunEventType = pgEnum("agent_run_event_type", [
   "text",
@@ -31,6 +32,7 @@ export const agentRunEventType = pgEnum("agent_run_event_type", [
   "error",
   "info",
   "message",
+  "log", // for migrated task logs
 ]);
 
 // Event stream for agent runs (text, tool use, thinking, errors, etc.)

@@ -22,6 +22,9 @@ const CORE_TABLES = [
   "repo_pods",
   "interactive_sessions",
   "tasks",
+  "agent_runs",
+  "agent_run_events",
+  "agent_run_prs",
 ];
 
 export const TABLE_COLUMNS: Record<string, string[]> = {
@@ -124,6 +127,29 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
     "created_at",
     "updated_at",
   ],
+  agent_runs: [
+    "id",
+    "workspace_id",
+    "repo_id",
+    "title",
+    "initial_prompt",
+    "mode",
+    "state",
+    "agent_type",
+    "model",
+    "branch_name",
+    "worktree_path",
+    "session_id",
+    "pr_url",
+    "cost_usd",
+    "max_turns",
+    "metadata",
+    "created_at",
+    "updated_at",
+    "ended_at",
+  ],
+  agent_run_events: ["id", "agent_run_id", "timestamp", "type", "content", "turn"],
+  agent_run_prs: ["id", "agent_run_id", "pr_url", "pr_number", "title", "state", "created_at"],
 };
 
 export async function validateSchema(): Promise<SchemaValidationResult> {

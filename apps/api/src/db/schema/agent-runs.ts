@@ -9,6 +9,7 @@ import {
   index,
   pgEnum,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { workspaces, repos } from "../schema.js";
 
 export const agentRunMode = pgEnum("agent_run_mode", ["autonomous", "supervised", "interactive"]);
@@ -46,7 +47,7 @@ export const agentRuns = pgTable(
     worktreePath: text("worktree_path"),
     sessionId: text("session_id"),
     prUrl: text("pr_url"),
-    costUsd: numeric("cost_usd", { precision: 10, scale: 6 }).default("0"),
+    costUsd: numeric("cost_usd", { precision: 10, scale: 6 }).default(sql`0`),
     maxTurns: integer("max_turns"),
     metadata: jsonb("metadata").$type<{
       dependsOn?: string[];
