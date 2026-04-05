@@ -23,6 +23,7 @@ export const agentRunState = pgEnum("agent_run_state", [
   "cancelled",
 ]);
 
+// Agent runs: track high-level execution of an agent on a repo
 export const agentRuns = pgTable(
   "agent_runs",
   {

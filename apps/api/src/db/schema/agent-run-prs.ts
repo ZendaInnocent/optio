@@ -1,6 +1,7 @@
-import { pgTable, uuid, timestamp, integer, text, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, timestamp, integer, text, index, unique } from "drizzle-orm/pg-core";
 import { agentRuns } from "./agent-runs.js";
 
+// Tracks PRs associated with agent runs
 export const agentRunPrs = pgTable(
   "agent_run_prs",
   {
@@ -14,5 +15,8 @@ export const agentRunPrs = pgTable(
     state: text("state"), // open, merged, closed
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("agent_run_prs_agent_run_id_idx").on(table.agentRunId)],
+  (table) => [
+    index("agent_run_prs_agent_run_id_idx").on(table.agentRunId),
+    unique("agent_run_prs_agent_run_pr_url_key").on(table.agentRunId, table.prUrl),
+  ],
 );
