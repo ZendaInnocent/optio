@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { agentRuns, AgentRunMode, AgentRunState } from "../db/schema/agent-runs.ts";
 import { agentRunEvents } from "../db/schema/agent-run-events.ts";
@@ -50,23 +50,39 @@ export async function transitionState(
     throw new Error(`Invalid transition: ${run.state} -> ${newState}`);
   }
 
-  const [updated] = await db
+  const updated = await db
     .update(agentRuns)
     .set({ state: newState, updatedAt: new Date() })
-    .where(eq(agentRuns.id, runId))
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.state, run.state)))
     .returning();
 
-  return updated;
+  if (updated.length === 0) {
+    // Another worker changed the state between our read and write
+    const current = await getAgentRun(runId);
+    if (!current) throw new Error("Agent run not found");
+    if (current.state !== run.state) throw new Error("Concurrent state modification detected");
+    // If we get here, theoretically unreachable but for safety
+    throw new Error("Failed to update state");
+  }
+
+  return updated[0];
 }
 
 export async function switchMode(runId: string, newMode: AgentRunMode) {
-  const [updated] = await db
+  const run = await getAgentRun(runId);
+  if (!run) throw new Error("Agent run not found");
+
+  const updated = await db
     .update(agentRuns)
     .set({ mode: newMode, updatedAt: new Date() })
     .where(eq(agentRuns.id, runId))
     .returning();
 
-  return updated;
+  if (!updated || updated.length === 0) {
+    throw new Error("Failed to update mode");
+  }
+
+  return updated[0];
 }
 
 export async function recordEvent(runId: string, type: string, content: any, turn?: number) {

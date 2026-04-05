@@ -267,11 +267,53 @@ describe("AgentRunService", () => {
 
       await expect(transitionState("nonexistent", "queued")).rejects.toThrow("not found");
     });
+
+    it("detects concurrent state modification", async () => {
+      const existingRun = { id: "run-1", state: "pending" };
+      const modifiedRun = { id: "run-1", state: "running" };
+
+      // Mock db.select to return runs via proper chain
+      const limitMock = vi
+        .fn()
+        .mockResolvedValueOnce([existingRun]) // first .limit() call
+        .mockResolvedValueOnce([modifiedRun]); // second .limit() call after update fails
+
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: limitMock,
+          }),
+        }),
+      });
+
+      // Update returns empty array (0 rows affected)
+      (db.update as any) = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      await expect(transitionState("run-1", "queued")).rejects.toThrow(
+        "Concurrent state modification detected",
+      );
+    });
   });
 
   describe("switchMode", () => {
     it("changes mode and updates timestamp", async () => {
+      const existingRun = { id: "run-1", mode: "autonomous" };
       const updatedRun = { id: "run-1", mode: "interactive", updatedAt: new Date() };
+
+      // Mock getAgentRun to return the existing run
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([existingRun]),
+          }),
+        }),
+      });
 
       (db.update as any) = vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
@@ -283,6 +325,18 @@ describe("AgentRunService", () => {
 
       const result = await switchMode("run-1", "interactive");
       expect(result.mode).toBe("interactive");
+    });
+
+    it("throws if agent run not found", async () => {
+      (db.select as any) = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      await expect(switchMode("nonexistent", "interactive")).rejects.toThrow("Agent run not found");
     });
   });
 
