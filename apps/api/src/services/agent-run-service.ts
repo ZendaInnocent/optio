@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { agentRuns, AgentRunMode, AgentRunState } from "../db/schema/agent-runs.ts";
 import { agentRunEvents } from "../db/schema/agent-run-events.ts";
@@ -109,4 +109,29 @@ export async function registerPr(runId: string, prUrl: string, prNumber?: number
     title,
     state: "open",
   });
+}
+
+export async function listAgentRuns(params?: {
+  mode?: AgentRunMode;
+  state?: AgentRunState;
+  limit?: number;
+  offset?: number;
+  cursor?: string;
+}) {
+  const query = db.select().from(agentRuns);
+
+  const conditions: any[] = [];
+  if (params?.mode) conditions.push(eq(agentRuns.mode, params.mode));
+  if (params?.state) conditions.push(eq(agentRuns.state, params.state));
+
+  if (conditions.length > 0) {
+    query.where(and(...conditions));
+  }
+
+  query.orderBy(desc(agentRuns.createdAt));
+
+  if (params?.limit) query.limit(params.limit);
+  if (params?.offset) query.offset(params.offset);
+
+  return query;
 }

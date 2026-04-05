@@ -33,6 +33,17 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Agent Runs
+  listAgentRuns: (params?: { mode?: string; state?: string; limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.mode) qs.set("mode", params.mode);
+    if (params?.state) qs.set("state", params.state);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.offset) qs.set("offset", String(params.offset));
+    const query = qs.toString();
+    return request<{ runs: any[] }>(`/api/agent-runs${query ? `?${query}` : ""}`);
+  },
+
   // Tasks
   listTasks: (params?: { state?: string; limit?: number; offset?: number }) => {
     const qs = new URLSearchParams();

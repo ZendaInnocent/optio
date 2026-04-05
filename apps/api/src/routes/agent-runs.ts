@@ -44,6 +44,25 @@ export async function agentRunRoutes(app: FastifyInstance) {
     };
   }
 
+  // GET /api/agent-runs - list agent runs with optional filters
+  app.get("/api/agent-runs", { preValidation: app.authRequired }, async (req: any, reply: any) => {
+    const { mode, state, limit, offset } = req.query as {
+      mode?: string;
+      state?: string;
+      limit?: string;
+      offset?: string;
+    };
+
+    const runs = await agentRunService.listAgentRuns({
+      mode: mode as any,
+      state: state as any,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+
+    reply.send({ runs });
+  });
+
   // POST /api/agent-runs - create a new agent run
   app.post("/api/agent-runs", { preValidation: app.authRequired }, async (req: any, reply: any) => {
     const parsed = createAgentRunSchema.safeParse(req.body);
