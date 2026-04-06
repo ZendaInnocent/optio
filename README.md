@@ -156,6 +156,7 @@ API .............. http://localhost:30400
 
 - Edit any `.ts`/`.tsx` file → changes sync into pods in ~1-2 seconds
 - API auto-restarts via `tsx watch`, Web auto-refreshes via Next.js HMR
+- **Smart rebuilds:** Tilt rebuilds only the affected service (API changes don't rebuild Web, and vice versa)
 - All infrastructure (Postgres, Redis) runs in the same cluster
 - Open the Tilt UI for live logs, resource status, and one-click port-forwards
 

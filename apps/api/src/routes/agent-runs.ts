@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import * as agentRunService from "../services/agent-run-service.js";
+import { isAuthDisabled } from "../services/oauth/index.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -38,6 +39,7 @@ export async function agentRunRoutes(app: FastifyInstance) {
   // Define authRequired check
   if (!app.authRequired) {
     app.authRequired = async (req: any, reply: any) => {
+      if (isAuthDisabled()) return;
       if (!req.user) {
         return reply.code(401).send({ error: "Authentication required" });
       }

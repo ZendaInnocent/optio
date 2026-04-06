@@ -1,19 +1,19 @@
+import { Queue } from "bullmq";
 import dotenv from "dotenv";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { logger } from "./logger.js";
+import { buildServer } from "./server.js";
+import { startImageBuildWorker } from "./workers/image-build-worker.js";
+import { startPrWatcherWorker } from "./workers/pr-watcher-worker.js";
+import { startRepoCleanupWorker } from "./workers/repo-cleanup-worker.js";
+import { startScheduleWorker } from "./workers/schedule-worker.js";
+import { reconcileOrphanedTasks, startTaskWorker } from "./workers/task-worker.js";
+import { startTicketSyncWorker } from "./workers/ticket-sync-worker.js";
+import { startWebhookWorker } from "./workers/webhook-worker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, "../../../.env") });
-import { Queue } from "bullmq";
-import { buildServer } from "./server.js";
-import { startTaskWorker, reconcileOrphanedTasks } from "./workers/task-worker.js";
-import { startTicketSyncWorker } from "./workers/ticket-sync-worker.js";
-import { startRepoCleanupWorker } from "./workers/repo-cleanup-worker.js";
-import { startPrWatcherWorker } from "./workers/pr-watcher-worker.js";
-import { startWebhookWorker } from "./workers/webhook-worker.js";
-import { startScheduleWorker } from "./workers/schedule-worker.js";
-import { startImageBuildWorker } from "./workers/image-build-worker.js";
-import { logger } from "./logger.js";
 
 const redisConnection = {
   url: process.env.REDIS_URL ?? "redis://localhost:6379",

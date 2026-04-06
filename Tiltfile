@@ -32,6 +32,30 @@ docker_build(
     "optio-base",
     ".",
     dockerfile="Dockerfile.base",
+    only=[
+        "Dockerfile.base",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        "tsconfig.base.json",
+        # Workspace package.json and tsconfig files
+        "apps/api/package.json",
+        "apps/api/tsconfig.json",
+        "apps/web/package.json",
+        "apps/web/tsconfig.json",
+        "packages/shared/package.json",
+        "packages/shared/tsconfig.json",
+        "packages/container-runtime/package.json",
+        "packages/container-runtime/tsconfig.json",
+        "packages/agent-adapters/package.json",
+        "packages/agent-adapters/tsconfig.json",
+        "packages/ticket-providers/package.json",
+        "packages/ticket-providers/tsconfig.json",
+        "packages/image-builder/package.json",
+        "packages/image-builder/tsconfig.json",
+        "scripts/repo-init.sh",
+    ],
     extra_tag="optio-base:latest",
 )
 
@@ -43,6 +67,11 @@ docker_build(
     "optio-api",
     ".",
     dockerfile="Dockerfile.api.dev",
+    only=[
+        "Dockerfile.api.dev",
+        "apps/api/",
+        "packages/",
+    ],
     live_update=[
         sync("./apps/api/", "/app/apps/api/"),
         sync("./packages/", "/app/packages/"),
@@ -57,6 +86,11 @@ docker_build(
     "optio-web",
     ".",
     dockerfile="Dockerfile.web.dev",
+    only=[
+        "Dockerfile.web.dev",
+        "apps/web/",
+        "packages/shared/",
+    ],
     live_update=[
         sync("./apps/web/", "/app/apps/web/"),
         sync("./packages/shared/", "/app/packages/shared/"),

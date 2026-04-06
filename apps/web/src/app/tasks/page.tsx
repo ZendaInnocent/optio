@@ -316,9 +316,17 @@ function IssuesBrowser() {
           <CircleDot className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>No open issues found</p>
           <p className="text-xs mt-1">
-            {repos.length === 0
-              ? "Add a repo first in the Repos settings."
-              : "Issues will appear here from your configured repos."}
+            {repos.length === 0 ? (
+              <>
+                Add a repository first in{" "}
+                <Link href="/repos" className="text-primary hover:underline">
+                  Repositories
+                </Link>
+                .
+              </>
+            ) : (
+              "Issues will appear here from your configured repos."
+            )}
           </p>
         </div>
       ) : (

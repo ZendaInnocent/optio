@@ -46,6 +46,7 @@ export const agentRuns = pgTable(
     branchName: text("branch_name"),
     worktreePath: text("worktree_path"),
     sessionId: text("session_id"),
+    sessionToken: text("session_token"),
     prUrl: text("pr_url"),
     costUsd: numeric("cost_usd", { precision: 10, scale: 6 }).default(sql`0`),
     maxTurns: integer("max_turns"),

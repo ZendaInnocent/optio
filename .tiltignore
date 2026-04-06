@@ -1,20 +1,48 @@
-# Build artifacts
+# Tiltignore for Optio Dev Environment
+# ======================================
+# 
+# IMPORTANT: Do NOT use blanket "**" ignore pattern! That breaks live_update.
+# Source files (apps/, packages/) MUST be watched so Tilt can sync changes.
+#
+# This file controls which files Tilt watches for changes:
+# - Watched files → trigger live_update (if in sync patterns) OR rebuild (if only in context)
+# - Ignored files → no action
+#
+# Goal: Minimize unnecessary rebuilds while ensuring hot-reload works.
+# ======================================================================
+
+# Build artifacts - safe to ignore (no rebuilds, no live updates)
 .turbo/
 **/.turbo/
 *.tsbuildinfo
-
-# Linting
 .eslintcache
 
-# Node modules (should already be in .dockerignore)
+# Dependencies - huge, irrelevant for rebuild triggers
 node_modules/
+**/node_modules/
 
-# Ignore everything else for rebuild triggers
-**
+# Non-source directories - these don't contain running code
+# Ignoring them prevents unnecessary rebuilds when docs/helm change
+helm/
+docs/
+agent_docs/
+.github/
+scripts/  # setup scripts, not runtime code
 
-# Except Dockerfiles and dependency files
-!Dockerfile.base
-!Dockerfile.api.dev
-!Dockerfile.web.dev
-!package.json
-!pnpm-lock.yaml
+# Test/coverage outputs - just artifacts
+**/test-results/
+**/coverage/
+**/*.log
+**/npm-debug.log
+**/yarn-debug.log
+**/yarn-error.log
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

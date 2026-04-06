@@ -1,8 +1,14 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { agentRuns, AgentRunMode, AgentRunState } from "../db/schema/agent-runs.ts";
-import { agentRunEvents } from "../db/schema/agent-run-events.ts";
-import { agentRunPrs } from "../db/schema/agent-run-prs.ts";
+import {
+  agentRuns,
+  agentRunMode,
+  agentRunState,
+  type AgentRunMode,
+  type AgentRunState,
+} from "../db/schema/agent-runs.js";
+import { agentRunEvents } from "../db/schema/agent-run-events.js";
+import { agentRunPrs } from "../db/schema/agent-run-prs.js";
 import {
   agentRunCanTransition as canTransition,
   agentRunTerminalStates as TERMINAL_STATES,
@@ -18,6 +24,7 @@ export async function createAgentRun(input: {
   mode: AgentRunMode;
   maxTurns?: number;
   dependsOn?: string[];
+  sessionToken?: string;
 }) {
   const [run] = await db
     .insert(agentRuns)

@@ -1,13 +1,5 @@
 # AGENTS.md — Optio Agent Guidelines
 
-## Startup (MANDATORY — Execute First, Every Session)
-
-Before doing anything else, read these files in order:
-
-1. `agent_docs/contract.md` — Operational contract (mandatory adherence)
-
-**Do not answer questions, write code, or take any action until both files are read.**
-
 ## Project
 
 Optio: workflow orchestration for AI coding agents. Spins up isolated K8s pods per repo, manages git worktrees for concurrent tasks, streams logs to web UI.
@@ -49,9 +41,20 @@ node scripts/run-silent.js "lint" "pnpm lint"
 node scripts/run-silent.js "typecheck" "pnpm turbo typecheck"
 ```
 
-## Tilt Usage
+## Memory & Journal Usage (MANDATORY)
 
-- **NEVER run `tilt down`** — deletes PostgreSQL PVC
-- Use `tilt up` to start/rebuild
-- Use `tilt trigger <resource>` to rebuild specific resources
-- Use `docker build` directly for new images
+Use memory and journal tools to persist context across sessions.
+
+**Memory blocks** — update when:
+
+- Starting new work on this project (load project context)
+- Learning new project conventions, commands, or architecture
+- User shares preferences or constraints
+
+**Journal** — write entries when:
+
+- Making significant technical decisions
+- Discovering important patterns or gotchas
+- Finishing complex tasks worth remembering
+
+Update memory blocks at session start and whenever significant context is learned.

@@ -6,16 +6,23 @@ import type { FastifyInstance } from "fastify";
 
 const mockCreateAgentRun = vi.fn();
 const mockGetAgentRun = vi.fn();
+const mockListAgentRuns = vi.fn();
 const mockSwitchMode = vi.fn();
 const mockTransitionState = vi.fn();
 const mockRegisterPr = vi.fn();
 
+let authDisabled = false;
 vi.mock("../services/agent-run-service.js", () => ({
   createAgentRun: (...args: unknown[]) => mockCreateAgentRun(...args),
   getAgentRun: (...args: unknown[]) => mockGetAgentRun(...args),
+  listAgentRuns: (...args: unknown[]) => mockListAgentRuns(...args),
   switchMode: (...args: unknown[]) => mockSwitchMode(...args),
   transitionState: (...args: unknown[]) => mockTransitionState(...args),
   registerPr: (...args: unknown[]) => mockRegisterPr(...args),
+}));
+
+vi.mock("../services/oauth/index.js", () => ({
+  isAuthDisabled: () => authDisabled,
 }));
 
 import { agentRunRoutes } from "./agent-runs.js";
@@ -57,6 +64,7 @@ describe("Agent Run Routes", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    authDisabled = false;
   });
 
   describe("Authentication", () => {
@@ -140,6 +148,142 @@ describe("Agent Run Routes", () => {
         payload: { prUrl: "https://github.com/org/repo/pull/42" },
       });
       expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe("When auth is disabled", () => {
+    beforeEach(() => {
+      authDisabled = true;
+    });
+
+    const mockRun = {
+      id: "run-123",
+      title: "Test run",
+      state: "pending",
+      mode: "autonomous",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("GET /api/agent-runs returns 200", async () => {
+      mockListAgentRuns.mockResolvedValue([mockRun]);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/agent-runs",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("POST /api/agent-runs returns 201", async () => {
+      mockCreateAgentRun.mockResolvedValue(mockRun);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs",
+        payload: {
+          title: "Test",
+          initialPrompt: "Test",
+          repoId: "123e4567-e89b-12d3-a456-426614174000",
+          workspaceId: "123e4567-e89b-12d3-a456-426614174001",
+          agentType: "claude-code",
+          mode: "autonomous",
+        },
+      });
+      expect(res.statusCode).toBe(201);
+    });
+
+    it("GET /api/agent-runs/:id returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue(mockRun);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/agent-runs/run-123",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("POST /api/agent-runs/:id/mode returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
+      mockSwitchMode.mockResolvedValue(mockRun);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/mode",
+        payload: { mode: "autonomous" },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("POST /api/agent-runs/:id/interrupt returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
+      mockTransitionState.mockResolvedValue({ ...mockRun, state: "needs_attention" });
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/interrupt",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("POST /api/agent-runs/:id/resume returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
+      mockTransitionState.mockResolvedValue({ ...mockRun, state: "running" });
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/resume",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("POST /api/agent-runs/:id/end returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue({ id: "run-123" });
+      mockTransitionState.mockResolvedValue({ ...mockRun, state: "completed" });
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/end",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("GET /api/agent-runs/:id/events returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue(mockRun);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/agent-runs/run-123/events",
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual([]);
+    });
+
+    it("GET /api/agent-runs/:id/prs returns 200", async () => {
+      mockGetAgentRun.mockResolvedValue(mockRun);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/agent-runs/run-123/prs",
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual([]);
+    });
+
+    it("POST /api/agent-runs/:id/prs returns 201", async () => {
+      mockGetAgentRun.mockResolvedValue(mockRun);
+      mockRegisterPr.mockResolvedValue(undefined);
+      const noAuthApp = await buildTestAppNoAuth();
+      const res = await noAuthApp.inject({
+        method: "POST",
+        url: "/api/agent-runs/run-123/prs",
+        payload: { prUrl: "https://github.com/org/repo/pull/42" },
+      });
+      expect(res.statusCode).toBe(201);
     });
   });
 
